@@ -30,7 +30,8 @@ class Scenario(BaseScenario):
         landmark.name = 'landmark %d' % i
         landmark.collide = True
         landmark.movable = True
-        landmark.size = 0.3#05
+        landmark.size = 0.15#05
+        landmark.is_ball = True;
         # make initial conditions
         self.reset_world(world)
         return world
@@ -52,6 +53,7 @@ class Scenario(BaseScenario):
             if True:#not landmark.boundary:
                 landmark.state.p_pos = np.zeros(world.dim_p)
                 landmark.state.p_vel = np.zeros(world.dim_p)
+                landmark.is_movable = True; # make the ball movable again.
 
 
     def benchmark_data(self, agent, world):

@@ -153,16 +153,17 @@ class World(object):
                     if(p_force[b] is None): p_force[b] = 0.0
                     p_force[b] = f_b + p_force[b]
             if hasattr(self, 'use_walls') and self.use_walls:
-                wall_poses = [np.array([0,1]),np.array([0,-1]),np.array([1,0]),np.array([-1,0])];
-                
-                #can be sped up a bunch.
-                for w in wall_poses:
-                    wall_thickness = 0.5;
-                    delta_pos = entity_a.state.p_pos - w * (1.0+wall_thickness);
-                    delta_pos = np.dot(delta_pos,w)*w;
-                    dist_min = entity_a.size + wall_thickness
-                    force = self.force_from_delta_pos_and_min_dist(delta_pos, dist_min);
-                    p_force[a] += force;
+                goal_thickness = 0.3;
+                if not (hasattr(entity_a, 'is_ball') and entity_a.is_ball and abs(entity_a.state.p_pos[1]) < goal_thickness * 0.5):
+                    #can be sped up a bunch.
+                    wall_poses = [np.array([0,1]),np.array([0,-1]),np.array([1,0]),np.array([-1,0])];
+                    for w in wall_poses:
+                        wall_thickness = 0.5;
+                        delta_pos = entity_a.state.p_pos - w * (1.0+wall_thickness);
+                        delta_pos = np.dot(delta_pos,w)*w;
+                        dist_min = entity_a.size + wall_thickness
+                        force = self.force_from_delta_pos_and_min_dist(delta_pos, dist_min);
+                        p_force[a] += force;
         return p_force
 
     # integrate physical state
