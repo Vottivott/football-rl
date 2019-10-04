@@ -151,7 +151,18 @@ class World(object):
                     p_force[a] = f_a + p_force[a] 
                 if(f_b is not None):
                     if(p_force[b] is None): p_force[b] = 0.0
-                    p_force[b] = f_b + p_force[b]        
+                    p_force[b] = f_b + p_force[b]
+            if hasattr(self, 'use_walls') and self.use_walls:
+                wall_poses = [np.array([0,1]),np.array([0,-1]),np.array([1,0]),np.array([-1,0])];
+                
+                #can be sped up a bunch.
+                for w in wall_poses:
+                    wall_thickness = 0.5;
+                    delta_pos = entity_a.state.p_pos - w * (1.0+wall_thickness);
+                    delta_pos = np.dot(delta_pos,w)*w;
+                    dist_min = entity_a.size + wall_thickness
+                    force = self.force_from_delta_pos_and_min_dist(delta_pos, dist_min);
+                    p_force[a] += force;
         return p_force
 
     # integrate physical state
@@ -176,6 +187,13 @@ class World(object):
             noise = np.random.randn(*agent.action.c.shape) * agent.c_noise if agent.c_noise else 0.0
             agent.state.c = agent.action.c + noise      
 
+    def force_from_delta_pos_and_min_dist(self, delta_pos, dist_min):
+        dist = np.sqrt(np.sum(np.square(delta_pos)))
+        k = self.contact_margin
+        penetration = np.logaddexp(0, -(dist - dist_min)/k)*k
+        force = self.contact_force * delta_pos / dist * penetration
+        return force; 
+
     # get collision forces for any contact between two entities
     def get_collision_force(self, entity_a, entity_b):
         if (not entity_a.collide) or (not entity_b.collide):
@@ -184,13 +202,9 @@ class World(object):
             return [None, None] # don't collide against itself
         # compute actual distance between entities
         delta_pos = entity_a.state.p_pos - entity_b.state.p_pos
-        dist = np.sqrt(np.sum(np.square(delta_pos)))
-        # minimum allowable distance
         dist_min = entity_a.size + entity_b.size
-        # softmax penetration
-        k = self.contact_margin
-        penetration = np.logaddexp(0, -(dist - dist_min)/k)*k
-        force = self.contact_force * delta_pos / dist * penetration
+        force = self.force_from_delta_pos_and_min_dist(delta_pos,dist_min);
         force_a = +force if entity_a.movable else None
         force_b = -force if entity_b.movable else None
-        return [force_a, force_b]
+        return [force_a, force_b];
+

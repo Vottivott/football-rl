@@ -6,6 +6,7 @@ from multiagent.scenario import BaseScenario
 class Scenario(BaseScenario):
     def make_world(self):
         world = World()
+        world.use_walls = True
         # set any world properties first
         world.dim_c = 2
         num_good_agents = 2
