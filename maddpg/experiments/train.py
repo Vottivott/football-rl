@@ -57,9 +57,9 @@ def make_env(scenario_name, arglist, benchmark=False):
     # create world
     world = scenario.make_world()
     # create multiagent environment
-    def done_callback(world, agent):
+    def done_callback(agent, world):
         if hasattr(world, 'is_scenareo_over'):
-            return world.is_scenareo_over();
+            return world.is_scenareo_over(agent, world)
         return False
 
     if benchmark:
@@ -118,7 +118,9 @@ def train(arglist):
         print('Starting iterations...')
         while True:
             # get action
+            #action_n = [trainers[0].action(obs) for obs in obs_n]
             action_n = [agent.action(obs) for agent, obs in zip(trainers,obs_n)]
+
             # environment step
             new_obs_n, rew_n, done_n, info_n = env.step(action_n)
             episode_step += 1
@@ -165,6 +167,10 @@ def train(arglist):
             # update all trainers, if not in display or benchmark mode
             loss = None
             
+            #for index in range(len(trainers)):
+            #    trainers[0].preupdate()
+            #    loss = trainers[0].update(trainers, train_step, index)
+            
             for agent in trainers:
                 agent.preupdate()
             for agent in trainers:
@@ -176,7 +182,7 @@ def train(arglist):
                 # print statement depends on whether or not there are adversaries
                 if num_adversaries == 0:
                     print("steps: {}, episodes: {}, mean episode reward: {}, time: {}".format(
-                        train_step, len(episode_rewards), np.mean(episode_rewards[-arglist.save_rate:]), round(time.time()-t_start, 3)))
+                        train_step, len(episode_rewards), np.mean(np.abs(episode_rewards[-arglist.save_rate:])), round(time.time()-t_start, 3)))
                 else:
                     print("steps: {}, episodes: {}, mean episode reward: {}, agent episode reward: {}, time: {}".format(
                         train_step, len(episode_rewards), np.mean(episode_rewards[-arglist.save_rate:]),
