@@ -12,9 +12,11 @@ while 1:
     for fname in experience_files:
         fpath = join(path, fname)
         with open(fpath, "rb") as f:
-            pass
-            #print(pickle.load(f))
-        if True:
+            d = pickle.load(f)
+            print(len(d))
+            print(len(d[0]))
+            print(d[0])
+        if False:
             os.remove(fpath)
     print("Loaded %d games from %d files (in %.2f seconds)" % (200*num_files, num_files, time.time()-t0))
     time.sleep(3)

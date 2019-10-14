@@ -25,14 +25,14 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate for Adam optimizer")
     parser.add_argument("--gamma", type=float, default=0.95, help="discount factor")
     parser.add_argument("--batch-size", type=int, default=1024, help="number of episodes to optimize at the same time")
-    parser.add_argument("--num-units", type=int, default=64, help="number of units in the mlp")
+    parser.add_argument("--num-units", type=int, default=256, help="number of units in the mlp") #64
     # Checkpointing
     parser.add_argument("--exp-name", type=str, default="football", help="name of the experiment")
     parser.add_argument("--save-dir", type=str, default="../../policy/", help="directory in which training state and model should be saved")
     parser.add_argument("--save-rate", type=int, default=1000, help="save model once every time this many episodes are completed")
     parser.add_argument("--load-dir", type=str, default="", help="directory in which training state and model are loaded")
     # Evaluation
-    parser.add_argument("--restore", action="store_true", default=True)
+    parser.add_argument("--restore", action="store_true", default=False)
     parser.add_argument("--display", action="store_true", default=False)
     parser.add_argument("--benchmark", action="store_true", default=False)
     parser.add_argument("--benchmark-iters", type=int, default=100000, help="number of iterations run for benchmarking")
@@ -98,6 +98,7 @@ def train(arglist):
         if arglist.display or arglist.restore or arglist.benchmark:
             print('Loading previous state...')
             U.load_state(arglist.load_dir)
+        
 
         episode_rewards = [0.0]  # sum of rewards for all agents
         agent_rewards = [[0.0] for _ in range(env.n)]  # individual agent reward
@@ -110,8 +111,14 @@ def train(arglist):
         train_step = 0
         t_start = time.time()
 
+        if not (arglist.display or arglist.restore or arglist.benchmark):
+            U.save_state(arglist.save_dir, saver=saver)
+            print("Saved first checkpoint")
+
         current_game_experiences = []
         t0 = time.time()
+
+
 
         print('Starting iterations...')
         while True:
