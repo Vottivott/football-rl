@@ -118,9 +118,9 @@ def train(arglist):
 
             new_experiences = load_new_experiences()
             for exp in new_experiences:
-                for i,agent in enumerate(trainers):
-                    agent_exp = exp[i]
-                    agent.experience(*agent_exp)
+                obs_n, action_n, rew_n, new_obs_n, done_n, terminal = exp
+                for i, agent in enumerate(trainers):
+                    agent.experience(obs_n[i], action_n[i], rew_n[i], new_obs_n[i], done_n[i], terminal)
 
             # update all trainers, if not in display or benchmark mode
             loss = None
