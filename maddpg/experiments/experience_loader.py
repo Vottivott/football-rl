@@ -22,6 +22,6 @@ def load_new_experiences():
         except EOFError:
             print("EOFError in load_new_experiences - skipping 1 file")
         except Exception as e:
-            print("Error '{0}' occured. Arguments {1} - skipping 1 file".format(e.message, e.args))
+            print("Error occured. (Arguments {0}) - skipping 1 file".format(e.args))
     print("Loaded %d games from %d files (in %.2f seconds)" % (200 * num_files, num_files, time.time() - t0))
     return experiences
