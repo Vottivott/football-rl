@@ -119,25 +119,33 @@ class World(object):
         for agent in self.scripted_agents:
             agent.action = agent.action_callback(agent, self)
         # gather forces applied to entities
-        p_force = [None] * len(self.entities)
+        p_force = [0] * len(self.entities)
         # apply agent physical controls
-        p_force = self.apply_action_force(p_force)
+        p_force, k_force, has_kick = self.apply_action_force(p_force)
         # apply environment forces
         p_force = self.apply_environment_force(p_force)
         # integrate physical state
-        self.integrate_state(p_force)
+        self.integrate_state(p_force, k_force, has_kick)
         # update agent state
         for agent in self.agents:
             self.update_agent_state(agent)
 
     # gather agent action forces
     def apply_action_force(self, p_force):
+        k_force = np.zeros((self.dim_p,))
+        has_kick = False
         # set applied forces
         for i,agent in enumerate(self.agents):
             if agent.movable:
                 noise = np.random.randn(*agent.action.u.shape) * agent.u_noise if agent.u_noise else 0.0
-                p_force[i] = agent.action.u + noise                
-        return p_force
+                p_force[i] = agent.action.u + noise 
+
+            if hasattr(agent, 'kicking') and agent.kicking:
+                if np.sum(np.square(self.landmarks[0].state.p_pos - agent.state.p_pos)) < np.square(self.landmarks[0].size + agent.size):
+                    k_force += agent.action.kick
+                    has_kick = True
+
+        return p_force, k_force, has_kick
 
     # gather physical forces acting on entities
     def apply_environment_force(self, p_force):
@@ -151,12 +159,31 @@ class World(object):
                     p_force[a] = f_a + p_force[a] 
                 if(f_b is not None):
                     if(p_force[b] is None): p_force[b] = 0.0
-                    p_force[b] = f_b + p_force[b]        
+                    p_force[b] = f_b + p_force[b]
+            if hasattr(self, 'use_walls') and self.use_walls:
+                goal_thickness = 0.3;
+                is_ball = hasattr(entity_a, 'is_ball') and entity_a.is_ball
+
+                if not (is_ball and abs(entity_a.state.p_pos[1]) < goal_thickness * 0.5):
+                    #can be sped up a bunch.
+                    wall_poses = [np.array([0,1]),np.array([0,-1]),np.array([1,0]),np.array([-1,0])]
+                    for w in wall_poses:
+                        wall_thickness = 0.5
+                        delta_pos = entity_a.state.p_pos - w * (1.0+wall_thickness)
+                        delta_pos = np.dot(delta_pos,w)*w
+                        dist_min = entity_a.size + wall_thickness
+                        force = self.force_from_delta_pos_and_min_dist(delta_pos, dist_min)
+                        p_force[a] += force
+
         return p_force
 
     # integrate physical state
-    def integrate_state(self, p_force):
+    def integrate_state(self, p_force, k_force, has_kick):
         for i,entity in enumerate(self.entities):
+            is_ball = hasattr(entity, 'is_ball') and entity.is_ball
+            if is_ball and has_kick:
+                entity.state.p_vel = k_force
+
             if not entity.movable: continue
             entity.state.p_vel = entity.state.p_vel * (1 - self.damping)
             if (p_force[i] is not None):
@@ -166,7 +193,10 @@ class World(object):
                 if speed > entity.max_speed:
                     entity.state.p_vel = entity.state.p_vel / np.sqrt(np.square(entity.state.p_vel[0]) +
                                                                   np.square(entity.state.p_vel[1])) * entity.max_speed
+                                                                  
             entity.state.p_pos += entity.state.p_vel * self.dt
+
+
 
     def update_agent_state(self, agent):
         # set communication state (directly for now)
@@ -176,6 +206,13 @@ class World(object):
             noise = np.random.randn(*agent.action.c.shape) * agent.c_noise if agent.c_noise else 0.0
             agent.state.c = agent.action.c + noise      
 
+    def force_from_delta_pos_and_min_dist(self, delta_pos, dist_min):
+        dist = np.sqrt(np.sum(np.square(delta_pos)))
+        k = self.contact_margin
+        penetration = np.logaddexp(0, -(dist - dist_min)/k)*k
+        force = self.contact_force * delta_pos / dist * penetration
+        return force; 
+
     # get collision forces for any contact between two entities
     def get_collision_force(self, entity_a, entity_b):
         if (not entity_a.collide) or (not entity_b.collide):
@@ -184,13 +221,9 @@ class World(object):
             return [None, None] # don't collide against itself
         # compute actual distance between entities
         delta_pos = entity_a.state.p_pos - entity_b.state.p_pos
-        dist = np.sqrt(np.sum(np.square(delta_pos)))
-        # minimum allowable distance
         dist_min = entity_a.size + entity_b.size
-        # softmax penetration
-        k = self.contact_margin
-        penetration = np.logaddexp(0, -(dist - dist_min)/k)*k
-        force = self.contact_force * delta_pos / dist * penetration
+        force = self.force_from_delta_pos_and_min_dist(delta_pos,dist_min);
         force_a = +force if entity_a.movable else None
         force_b = -force if entity_b.movable else None
-        return [force_a, force_b]
+        return [force_a, force_b];
+
