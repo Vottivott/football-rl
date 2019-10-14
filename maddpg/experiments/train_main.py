@@ -118,7 +118,9 @@ def train(arglist):
 
             new_experiences = load_new_experiences()
             for exp in new_experiences:
-                agent.experience(*exp)
+                for i,agent in enumerate(trainers):
+                    agent_exp = exp[i]
+                    agent.experience(*agent_exp)
 
             # update all trainers, if not in display or benchmark mode
             loss = None
@@ -127,21 +129,7 @@ def train(arglist):
             for agent in trainers:
                 loss = agent.update(trainers, train_step)
 
-            if len(episode_rewards) % arglist.save_rate == 0:
-                U.save_state(arglist.save_dir, saver=saver)
-                # print statement depends on whether or not there are adversaries
-                if num_adversaries == 0:
-                    print("steps: {}, episodes: {}, mean episode abs-reward: {}, time: {}".format(
-                        train_step, len(episode_rewards), np.mean(np.abs(episode_rewards[-arglist.save_rate:])), round(time.time()-t_start, 3)))
-                else:
-                    print("steps: {}, episodes: {}, mean episode abs-reward: {}, agent episode abs-reward: {}, time: {}".format(
-                        train_step, len(episode_rewards), np.mean(np.abs(episode_rewards[-arglist.save_rate:])),
-                        [np.mean(np.abs(rew[-arglist.save_rate:])) for rew in agent_rewards], round(time.time()-t_start, 3)))
-                t_start = time.time()
-                # Keep track of final episode reward
-                final_ep_rewards.append(np.mean(episode_rewards[-arglist.save_rate:]))
-                for rew in agent_rewards:
-                    final_ep_ag_rewards.append(np.mean(rew[-arglist.save_rate:]))
+            U.save_state(arglist.save_dir, saver=saver)
 
 
 if __name__ == '__main__':
