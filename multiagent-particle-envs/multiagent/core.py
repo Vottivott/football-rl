@@ -138,11 +138,13 @@ class World(object):
         for i,agent in enumerate(self.agents):
             if agent.movable:
                 noise = np.random.randn(*agent.action.u.shape) * agent.u_noise if agent.u_noise else 0.0
-                p_force[i] = agent.action.u + noise 
+                p_force[i] = agent.action.u + noise
+                if agent.adversary:
+                     p_force[i] = -p_force[i] 
 
             if hasattr(agent, 'kicking') and agent.kicking:
                 if np.sum(np.square(self.landmarks[0].state.p_pos - agent.state.p_pos)) < np.square(self.landmarks[0].size + agent.size):
-                    k_force += agent.action.kick
+                    k_force += -agent.action.kick if agent.adversary else agent.action.kick
                     has_kick = True
 
         return p_force, k_force, has_kick
@@ -161,7 +163,7 @@ class World(object):
                     if(p_force[b] is None): p_force[b] = 0.0
                     p_force[b] = f_b + p_force[b]
             if hasattr(self, 'use_walls') and self.use_walls:
-                goal_thickness = 0.3;
+                goal_thickness = 0.3
                 is_ball = hasattr(entity_a, 'is_ball') and entity_a.is_ball
 
                 if not (is_ball and abs(entity_a.state.p_pos[1]) < goal_thickness * 0.5):
@@ -222,8 +224,8 @@ class World(object):
         # compute actual distance between entities
         delta_pos = entity_a.state.p_pos - entity_b.state.p_pos
         dist_min = entity_a.size + entity_b.size
-        force = self.force_from_delta_pos_and_min_dist(delta_pos,dist_min);
+        force = self.force_from_delta_pos_and_min_dist(delta_pos,dist_min)
         force_a = +force if entity_a.movable else None
         force_b = -force if entity_b.movable else None
-        return [force_a, force_b];
+        return [force_a, force_b]
 
