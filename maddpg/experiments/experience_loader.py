@@ -7,7 +7,7 @@ from os.path import isfile, join
 def load_new_experiences():
     path = "../../worker_experiences/"
     t0 = time.time()
-    experience_files = [f for f in listdir(path) if isfile(join(path, f))]
+    experience_files = sorted([f for f in listdir(path) if isfile(join(path, f))])
     num_files = len(experience_files)
     experiences = []
     for fname in experience_files:
@@ -19,5 +19,7 @@ def load_new_experiences():
                 os.remove(fpath)
         except OSError:
             print("OSError in load_new_experiences")
+        except EOFError:
+            print("EOFError in load_new_experiences - skipping 1 file")
     print("Loaded %d games from %d files (in %.2f seconds)" % (200 * num_files, num_files, time.time() - t0))
     return experiences
