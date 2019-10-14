@@ -9,8 +9,8 @@ class Scenario(BaseScenario):
         world.use_walls = True
         # set any world properties first
         world.dim_c = 2
-        num_good_agents = 2
-        num_adversaries = 2
+        num_good_agents = 4
+        num_adversaries = 4
         num_agents = num_adversaries + num_good_agents
         num_landmarks = 1
         # add agents
@@ -24,8 +24,8 @@ class Scenario(BaseScenario):
             agent.accel = 4.0
             agent.kicking = True
 
-            angle = np.linspace(0, 2*np.pi, 8, endpoint=False)[np.newaxis,:]
-            agent.kicks = np.concatenate([np.cos(angle), np.sin(angle)]).T * 3.0
+            angle = np.linspace(0, 2*np.pi, 32, endpoint=False)[np.newaxis,:]
+            agent.kicks = np.concatenate([np.cos(angle), np.sin(angle)]).T * 2.35
             agent.discrete_action_space = False
             #agent.accel = 20.0 if agent.adversary else 25.0
             agent.max_speed = 1.3
@@ -36,7 +36,7 @@ class Scenario(BaseScenario):
         landmark.name = 'landmark %d' % i
         landmark.collide = True
         landmark.movable = True
-        landmark.size = 0.15#05
+        landmark.size = 0.075
         landmark.is_ball = True
         # make initial conditions
         def done(agent, world):
