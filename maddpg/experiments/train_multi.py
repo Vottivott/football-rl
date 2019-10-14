@@ -139,7 +139,7 @@ def train(arglist):
                     a.append(0)
                 agent_info.append([[]])
 
-                if len(episode_rewards) % 200 == 0:
+                if len(episode_rewards) % 200 == 0 and not arglist.display:
                     fname = datetime.datetime.now().strftime('%Y-%m-%d %H.%M.%S.%f') + ".pkl"
                     with open("../../worker_experiences/" + fname, 'wb') as fp:
                         print("\n[%d] Finished 200 games in %.2f seconds" % (len(episode_rewards), time.time() - t0))
@@ -173,8 +173,16 @@ def train(arglist):
 
             # for displaying learned policies
             if arglist.display:
-                time.sleep(0.1)
+                time.sleep(0.05)
                 env.render()
+                if terminal:
+                    t0 = time.time()
+                    try:
+                        U.load_state(arglist.load_dir)
+                        print("Latest networks loaded in %.2f seconds" % (time.time() - t0))
+                        t0 = time.time()
+                    except tf.python.framework.errors_impl.DataLossError:
+                        print("Couldn't read latest network, it's probably being written...")
                 continue
 
             # update all trainers, if not in display or benchmark mode
