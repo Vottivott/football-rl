@@ -38,6 +38,9 @@ def parse_args():
 
 def mlp_model(input, num_outputs, scope, reuse=False, num_units=64, rnn_cell=None):
     # This model takes as input an observation and returns values of all actions
+    # Note(Daniel): No it fucking doesn't. It sometimes does that and sometimes it return just one value. I don't understand why.
+    #               ie. in one place (p_train) it's defined as model(in, num_actions),
+    #                   but twice (p_train & q_train) it's defined as model(in, 1). wtf? 
     with tf.variable_scope(scope, reuse=reuse):
         out = input
         out = layers.fully_connected(out, num_outputs=num_units, activation_fn=tf.nn.relu)
@@ -46,7 +49,7 @@ def mlp_model(input, num_outputs, scope, reuse=False, num_units=64, rnn_cell=Non
         return out
 
 def make_env(scenario_name, arglist, benchmark=False):
-    from multiagent.environment import MultiAgentEnv
+    from multiagent.environment import MultiAgentEnv, BatchMultiAgentEnv
     import multiagent.scenarios as scenarios
 
     # load scenario from script
@@ -63,6 +66,7 @@ def make_env(scenario_name, arglist, benchmark=False):
         env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, scenario.benchmark_data, done_callback = done_callback)
     else:
         env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, done_callback = done_callback)
+        #env = BatchMultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation)
     return env
 
 def get_trainers(env, num_adversaries, obs_shape_n, arglist):
@@ -160,6 +164,7 @@ def train(arglist):
 
             # update all trainers, if not in display or benchmark mode
             loss = None
+            
             for agent in trainers:
                 agent.preupdate()
             for agent in trainers:

@@ -47,6 +47,8 @@ class MultiAgentEnv(gym.Env):
                 u_action_space = spaces.Box(low=-agent.u_range, high=+agent.u_range, shape=(world.dim_p,), dtype=np.float32)
             if agent.movable:
                 total_action_space.append(u_action_space)
+
+
             # communication action space
             if self.discrete_action_space:
                 c_action_space = spaces.Discrete(world.dim_c)
@@ -54,6 +56,11 @@ class MultiAgentEnv(gym.Env):
                 c_action_space = spaces.Box(low=0.0, high=1.0, shape=(world.dim_c,), dtype=np.float32)
             if not agent.silent:
                 total_action_space.append(c_action_space)
+
+            if hasattr(agent, 'kicking') and agent.kicking:
+                kick_space = spaces.Discrete(len(agent.kicks))
+                total_action_space.append(kick_space)
+
             # total action space
             if len(total_action_space) > 1:
                 # all action spaces are discrete, so simplify to MultiDiscrete action space
@@ -143,6 +150,7 @@ class MultiAgentEnv(gym.Env):
     # set env action for a particular agent
     def _set_action(self, action, agent, action_space, time=None):
         agent.action.u = np.zeros(self.world.dim_p)
+        agent.action.kick = np.zeros(self.world.dim_p)
         agent.action.c = np.zeros(self.world.dim_c)
         # process action
         if isinstance(action_space, MultiDiscrete):
@@ -175,6 +183,8 @@ class MultiAgentEnv(gym.Env):
                     agent.action.u[1] += action[0][3] - action[0][4]
                 else:
                     agent.action.u = action[0]
+            
+
             sensitivity = 5.0
             if agent.accel is not None:
                 sensitivity = agent.accel
@@ -188,6 +198,11 @@ class MultiAgentEnv(gym.Env):
             else:
                 agent.action.c = action[0]
             action = action[1:]
+    
+        if hasattr(agent, 'kicking') and agent.kicking:
+            agent.action.kick = agent.kicks[np.argmax(action[0])]
+            action = action[1:]
+        
         # make sure we used all elements of action
         assert len(action) == 0
 

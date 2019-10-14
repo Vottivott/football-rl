@@ -9,8 +9,8 @@ class Scenario(BaseScenario):
         world.use_walls = True
         # set any world properties first
         world.dim_c = 2
-        num_good_agents = 2
-        num_adversaries = 2
+        num_good_agents = 1
+        num_adversaries = 1
         num_agents = num_adversaries + num_good_agents
         num_landmarks = 1
         # add agents
@@ -22,6 +22,11 @@ class Scenario(BaseScenario):
             agent.adversary = True if i < num_adversaries else False
             agent.size = 0.075
             agent.accel = 4.0
+            agent.kicking = True
+
+            angle = np.linspace(0, 2*np.pi, 8, endpoint=False)[np.newaxis,:]
+            agent.kicks = np.concatenate([np.cos(angle), np.sin(angle)]).T * 5.0
+            agent.discrete_action_space = False
             #agent.accel = 20.0 if agent.adversary else 25.0
             agent.max_speed = 1.3
         # add landmarks
@@ -31,7 +36,7 @@ class Scenario(BaseScenario):
         landmark.collide = True
         landmark.movable = True
         landmark.size = 0.15#05
-        landmark.is_ball = True;
+        landmark.is_ball = True
         # make initial conditions
         self.reset_world(world)
         return world
@@ -53,7 +58,7 @@ class Scenario(BaseScenario):
             if True:#not landmark.boundary:
                 landmark.state.p_pos = np.zeros(world.dim_p)
                 landmark.state.p_vel = np.zeros(world.dim_p)
-                landmark.is_movable = True; # make the ball movable again.
+                landmark.is_movable = True # make the ball movable again.
 
 
     def benchmark_data(self, agent, world):
@@ -89,7 +94,7 @@ class Scenario(BaseScenario):
         return main_reward
 
     def agent_reward(self, world):
-        return world.landmarks[0].state.p_vel[0];
+        return world.landmarks[0].state.p_vel[0]
 
     def observation(self, agent, world):
         # get positions of all entities in this agent's reference frame
@@ -104,16 +109,12 @@ class Scenario(BaseScenario):
         opponent_vel = []
         for other in world.agents:
             if other is agent: continue
-        if other.adversary == agent.adversary:
-            team_mate_pos.append(other.state.p_pos-world.landmarks[0].state.p_pos);
-            team_mate_vel.append(other.state.p_vel);
-        else:
-            opponent_pos.append(other.state.p_pos-world.landmarks[0].state.p_pos);#agent.state.p_pos);
-            opponent_vel.append(other.state.p_vel);
-        ball_position = world.landmarks[0].state.p_pos-agent.state.p_pos
+            if other.adversary == agent.adversary:
+                team_mate_pos.append(other.state.p_pos-world.landmarks[0].state.p_pos)
+                team_mate_vel.append(other.state.p_vel)
+            else:
+                opponent_pos.append(other.state.p_pos-world.landmarks[0].state.p_pos)
+                opponent_vel.append(other.state.p_vel)
+        ball_position = world.landmarks[0].state.p_pos
         ball_vel = world.landmarks[0].state.p_vel
-    #comm.append(other.state.c)
-    #other_pos.append(other.state.p_pos - agent.state.p_pos)
-    #if not other.adversary:
-    #    other_vel.append(other.state.p_vel)
-        return np.concatenate([agent.state.p_vel] + [agent.state.p_pos] + [ball_position] + [ball_vel] + team_mate_pos + team_mate_vel + opponent_pos + opponent_vel)
+        return np.concatenate([agent.state.p_vel] + [agent.state.p_pos-world.landmarks[0].state.p_pos] + [ball_position] + [ball_vel] + team_mate_pos + team_mate_vel + opponent_pos + opponent_vel)
