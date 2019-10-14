@@ -147,9 +147,12 @@ def train(arglist):
                         print("Saved experience file " + fname)
                         print('Loading latest networks...')
                         t0 = time.time()
-                        U.load_state(arglist.load_dir)
-                        print("Latest networks loaded in %.2f seconds" % (time.time()-t0))
-                        t0 = time.time()
+                        try:
+                            U.load_state(arglist.load_dir)
+                            print("Latest networks loaded in %.2f seconds" % (time.time() - t0))
+                            t0 = time.time()
+                        except tf.python.framework.errors_impl.DataLossError:
+                            print("Couldn't read latest network, it's probably being written...")
 
                     current_game_experiences = []
 
