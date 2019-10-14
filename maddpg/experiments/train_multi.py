@@ -57,10 +57,16 @@ def make_env(scenario_name, arglist, benchmark=False):
     # create world
     world = scenario.make_world()
     # create multiagent environment
+    def done_callback(agent, world):
+        if hasattr(world, 'is_scenareo_over'):
+            return world.is_scenareo_over(agent, world)
+        return False
+
     if benchmark:
-        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, scenario.benchmark_data)
+        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, scenario.benchmark_data, done_callback = done_callback)
     else:
-        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation)
+        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, done_callback = done_callback)
+        #env = BatchMultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation)
     return env
 
 def get_trainers(env, num_adversaries, obs_shape_n, arglist):
