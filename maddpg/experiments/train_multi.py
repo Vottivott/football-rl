@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate for Adam optimizer")
     parser.add_argument("--gamma", type=float, default=0.95, help="discount factor")
     parser.add_argument("--batch-size", type=int, default=1024, help="number of episodes to optimize at the same time")
-    parser.add_argument("--num-units", type=int, default=64, help="number of units in the mlp")
+    parser.add_argument("--num-units", type=int, default=256, help="number of units in the mlp") #64
     # Checkpointing
     parser.add_argument("--exp-name", type=str, default="football", help="name of the experiment")
     parser.add_argument("--save-dir", type=str, default="../../policy/", help="directory in which training state and model should be saved")
@@ -57,10 +57,16 @@ def make_env(scenario_name, arglist, benchmark=False):
     # create world
     world = scenario.make_world()
     # create multiagent environment
+    def done_callback(agent, world):
+        if hasattr(world, 'is_scenareo_over'):
+            return world.is_scenareo_over(agent, world)
+        return False
+
     if benchmark:
-        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, scenario.benchmark_data)
+        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, scenario.benchmark_data, done_callback = done_callback)
     else:
-        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation)
+        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, done_callback = done_callback)
+        #env = BatchMultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation)
     return env
 
 def get_trainers(env, num_adversaries, obs_shape_n, arglist):
@@ -194,7 +200,7 @@ def train(arglist):
 
             # save model, display training output
             if terminal and (len(episode_rewards) % arglist.save_rate == 0):
-                U.save_state(arglist.save_dir, saver=saver)
+                #U.save_state(arglist.save_dir, saver=saver)
                 # print statement depends on whether or not there are adversaries
                 if num_adversaries == 0:
                     print("steps: {}, episodes: {}, mean episode abs-reward: {}, time: {}".format(
