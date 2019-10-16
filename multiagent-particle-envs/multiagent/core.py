@@ -140,11 +140,14 @@ class World(object):
                 noise = np.random.randn(*agent.action.u.shape) * agent.u_noise if agent.u_noise else 0.0
                 p_force[i] = agent.action.u + noise
                 if agent.adversary:
-                     p_force[i] = -p_force[i] 
+                     p_force[i][0] = -p_force[i][0] 
 
             if hasattr(agent, 'kicking') and agent.kicking:
                 if np.sum(np.square(self.landmarks[0].state.p_pos - agent.state.p_pos)) < np.square(self.landmarks[0].size + agent.size):
-                    k_force += -agent.action.kick if agent.adversary else agent.action.kick
+                    kick  = agent.action.kick.copy()
+                    if agent.adversary: 
+                        kick[0] = -kick[0]
+                    k_force += kick
                     has_kick = True
 
         return p_force, k_force, has_kick
