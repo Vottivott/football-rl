@@ -10,6 +10,9 @@ import tensorflow.contrib.layers as layers
 
 import datetime
 
+import video_maker
+
+
 def parse_args():
     parser = argparse.ArgumentParser("Reinforcement Learning experiments for multiagent environments")
     # Environment
@@ -32,11 +35,14 @@ def parse_args():
     parser.add_argument("--load-dir", type=str, default="", help="directory in which training state and model are loaded")
     # Evaluation
     parser.add_argument("--restore", action="store_true", default=True)
-    parser.add_argument("--display", action="store_true", default=False)
+    parser.add_argument("--display", action="store_true", default=True)
     parser.add_argument("--benchmark", action="store_true", default=False)
     parser.add_argument("--benchmark-iters", type=int, default=100000, help="number of iterations run for benchmarking")
     parser.add_argument("--benchmark-dir", type=str, default="./benchmark_files/", help="directory where benchmark data is saved")
     parser.add_argument("--plots-dir", type=str, default="./learning_curves/", help="directory where plot data is saved")
+
+    parser.add_argument("--video", action="store_true", default=True)
+
     return parser.parse_args()
 
 def mlp_model(input, num_outputs, scope, reuse=False, num_units=64, rnn_cell=None):
@@ -138,6 +144,8 @@ def train(arglist):
                 agent_rewards[i][-1] += rew
 
             if done or terminal:
+                #U.save_state(arglist.save_dir, saver=saver)
+                #print("SAVED")
                 obs_n = env.reset()
                 episode_step = 0
                 episode_rewards.append(0)
@@ -181,7 +189,12 @@ def train(arglist):
             if arglist.display:
                 time.sleep(0.05)
                 env.render()
-                if terminal:
+                if arglist.video:
+                    video_maker.save_frame(episode_step)
+                if terminal and len(episode_rewards) % 5 == 0:
+                    if arglist.video:
+                        video_maker.combine_frames_to_video("../../videos/test_video.mp4")
+
                     t0 = time.time()
                     try:
                         U.load_state(arglist.load_dir)

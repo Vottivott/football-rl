@@ -109,7 +109,6 @@ class Viewer(object):
             arr = arr[::-1,:,0:3]
         self.window.flip()
         self.onetime_geoms = []
-        pyglet.image.get_buffer_manager().get_color_buffer().save('screenshot.png')
         return arr
 
     # Convenience
