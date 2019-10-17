@@ -11,6 +11,7 @@ import tensorflow.contrib.layers as layers
 import datetime
 
 import video_maker
+from folder_tools import clear_folder
 
 
 def parse_args():
@@ -193,8 +194,8 @@ def train(arglist):
                     video_maker.save_frame(episode_step)
                 if terminal and len(episode_rewards) % 5 == 0:
                     if arglist.video:
+                        clear_folder("../../frames/")
                         video_maker.combine_frames_to_video("../../videos/test_video.mp4")
-
                     t0 = time.time()
                     try:
                         U.load_state(arglist.load_dir)
