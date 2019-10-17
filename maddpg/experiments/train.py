@@ -6,13 +6,14 @@ import pickle
 
 import maddpg.common.tf_util as U
 from maddpg.trainer.maddpg import MADDPGAgentTrainer
+from maddpg.trainer.maddpg import update_fast
 import tensorflow.contrib.layers as layers
 
 def parse_args():
     parser = argparse.ArgumentParser("Reinforcement Learning experiments for multiagent environments")
     # Environment
     parser.add_argument("--scenario", type=str, default="simple", help="name of the scenario script")
-    parser.add_argument("--max-episode-len", type=int, default=25, help="maximum episode length")
+    parser.add_argument("--max-episode-len", type=int, default=100, help="maximum episode length")
     parser.add_argument("--num-episodes", type=int, default=60000, help="number of episodes")
     parser.add_argument("--num-adversaries", type=int, default=0, help="number of adversaries")
     parser.add_argument("--good-policy", type=str, default="maddpg", help="policy for good agents")
@@ -28,7 +29,7 @@ def parse_args():
     parser.add_argument("--save-rate", type=int, default=1000, help="save model once every time this many episodes are completed")
     parser.add_argument("--load-dir", type=str, default="", help="directory in which training state and model are loaded")
     # Evaluation
-    parser.add_argument("--restore", action="store_true", default=True)
+    parser.add_argument("--restore", action="store_true", default=False)
     parser.add_argument("--display", action="store_true", default=False)
     parser.add_argument("--benchmark", action="store_true", default=False)
     parser.add_argument("--benchmark-iters", type=int, default=100000, help="number of iterations run for benchmarking")
@@ -91,6 +92,7 @@ def train(arglist):
         # Create agent trainers
         obs_shape_n = [env.observation_space[i].shape for i in range(env.n)]
         num_adversaries = min(env.n, arglist.num_adversaries)
+        num_adversaries = 0
         trainers = get_trainers(env, num_adversaries, obs_shape_n, arglist)
         print('Using good policy {} and adv policy {}'.format(arglist.good_policy, arglist.adv_policy))
 
@@ -116,11 +118,14 @@ def train(arglist):
         t_start = time.time()
 
         print('Starting iterations...')
+        single_nn = True
         while True:
             # get action
-            #action_n = [trainers[0].action(obs) for obs in obs_n]
-            action_n = [agent.action(obs) for agent, obs in zip(trainers,obs_n)]
-
+            if single_nn:
+                action_n = [trainers[0].action(obs) for obs in obs_n] # this should be done in parallel!
+            else:
+                action_n = [agent.action(obs) for agent, obs in zip(trainers,obs_n)]
+            
             # environment step
             new_obs_n, rew_n, done_n, info_n = env.step(action_n)
             episode_step += 1
@@ -160,33 +165,36 @@ def train(arglist):
 
             # for displaying learned policies
             if arglist.display:
-                time.sleep(0.1)
+                time.sleep(0.02)
                 env.render()
                 continue
 
             # update all trainers, if not in display or benchmark mode
             loss = None
-            
-            #for index in range(len(trainers)):
-            #    trainers[0].preupdate()
-            #    loss = trainers[0].update(trainers, train_step, index)
-            
-            for agent in trainers:
-                agent.preupdate()
-            for agent in trainers:
-                loss = agent.update(trainers, train_step)
+            if single_nn and False: #minor speedup and not working at all...
+                loss = update_fast(trainers, train_step)
+            elif single_nn:
+                for index in range(len(trainers)):
+                    trainers[0].preupdate()
+                    loss = trainers[0].update(trainers, train_step, index)
+            else:
+                for agent in trainers:
+                    agent.preupdate()
+                for agent in trainers:
+                    loss = agent.update(trainers, train_step)
 
             # save model, display training output
             if terminal and (len(episode_rewards) % arglist.save_rate == 0):
                 U.save_state(arglist.save_dir, saver=saver)
                 # print statement depends on whether or not there are adversaries
-                if num_adversaries == 0:
+                if num_adversaries == 0 and False:
                     print("steps: {}, episodes: {}, mean episode reward: {}, time: {}".format(
                         train_step, len(episode_rewards), np.mean(np.abs(episode_rewards[-arglist.save_rate:])), round(time.time()-t_start, 3)))
                 else:
                     print("steps: {}, episodes: {}, mean episode reward: {}, agent episode reward: {}, time: {}".format(
-                        train_step, len(episode_rewards), np.mean(episode_rewards[-arglist.save_rate:]),
-                        [np.mean(rew[-arglist.save_rate:]) for rew in agent_rewards], round(time.time()-t_start, 3)))
+                        train_step, len(episode_rewards), np.mean(np.abs(episode_rewards[-arglist.save_rate:])),
+                        [np.mean(np.maximum(rew[-arglist.save_rate:], 0.0)) for rew in agent_rewards], round(time.time()-t_start, 3)))
+
                 t_start = time.time()
                 # Keep track of final episode reward
                 final_ep_rewards.append(np.mean(episode_rewards[-arglist.save_rate:]))

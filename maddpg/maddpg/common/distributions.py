@@ -203,6 +203,7 @@ class SoftCategoricalPd(Pd):
     def sample(self):
         u = tf.random_uniform(tf.shape(self.logits))
         return U.softmax(self.logits - tf.log(-tf.log(u)), axis=-1)  
+        #return U.softmax(self.logits, axis=-1) #Note(Daniel): I've killed all randomness!  
     @classmethod
     def fromflat(cls, flat):
         return cls(flat)        

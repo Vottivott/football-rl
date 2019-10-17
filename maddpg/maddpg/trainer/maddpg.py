@@ -24,8 +24,15 @@ def make_update_exp(vals, target_vals):
         expression.append(var_target.assign(polyak * var_target + (1.0-polyak) * var))
     expression = tf.group(*expression)
     return U.function([], [], updates=[expression])
-#is this the critic? Ie predictions of value for each agent.
+# Is this the critic? Ie predictions of value for each agent.
+# Nope. I'm pretty sure p stands for policy. And it has the correct number of outputs (number of actions).
+# This is actually the actor. Well p is. We also define the critic inside heh.
+# The question then is why do we both have a q-network and a policy-network. What makes them different. Should the policy not be ~max of q??
+# 
 def p_train(make_obs_ph_n, act_space_n, p_index, p_func, q_func, optimizer, grad_norm_clipping=None, local_q_func=False, num_units=64, scope="trainer", reuse=None):
+    #note(Daniel): We need to handle the change of the p_index somehow. hmm. We could just shuffle it I suppose?
+    #              The observations that is. I mean it's not the cleanest solution but we wouldn't have to change anything in here.
+    #              I'm gonna test that!
     with tf.variable_scope(scope, reuse=reuse):
         # create distribtuions
         act_pdtype_n = [make_pdtype(act_space) for act_space in act_space_n]
@@ -62,7 +69,9 @@ def p_train(make_obs_ph_n, act_space_n, p_index, p_func, q_func, optimizer, grad
         act = U.function(inputs=[obs_ph_n[p_index]], outputs=act_sample)
         p_values = U.function([obs_ph_n[p_index]], p)
 
-        # target network
+        # target network 
+        # Note(Daniel): Can we maybe skip this if we use the same network? Hmm probably should't
+        #               This is probably the same thing as target_q in dqn
         target_p = p_func(p_input, int(act_pdtype_n[p_index].param_shape()[0]), scope="target_p_func", num_units=num_units)
         target_p_func_vars = U.scope_vars(U.absolute_scope_name("target_p_func"))
         update_target_p = make_update_exp(p_func_vars, target_p_func_vars)
@@ -72,7 +81,11 @@ def p_train(make_obs_ph_n, act_space_n, p_index, p_func, q_func, optimizer, grad
 
         return act, train, update_target_p, {'p_values': p_values, 'target_act': target_act}
 
-#and this then the actor?
+# And this then the actor?
+# Nope. This is again the qritic. Aha my bad. We do send in the action as well.
+# So q actually is both the critic and the q-function at once I guess.¨
+# my question is though: How is this even connected back to p_train? Is it. or is this just some old bullshit we can skip.
+# Cause that is my thinking atm. Maybe i'll test just deleting it later?
 def q_train(make_obs_ph_n, act_space_n, q_index, q_func, optimizer, grad_norm_clipping=None, local_q_func=False, scope="trainer", reuse=None, num_units=64):
     with tf.variable_scope(scope, reuse=reuse):
         # create distribtuions
@@ -130,7 +143,8 @@ class MADDPGAgentTrainer(AgentTrainer):
             optimizer=tf.train.AdamOptimizer(learning_rate=args.lr),
             grad_norm_clipping=0.5,
             local_q_func=local_q_func,
-            num_units=args.num_units
+            num_units=args.num_units,
+            # reuse = tf.compat.v1.AUTO_REUSE,
         )
         self.act, self.p_train, self.p_update, self.p_debug = p_train(
             scope=self.name,
@@ -142,7 +156,8 @@ class MADDPGAgentTrainer(AgentTrainer):
             optimizer=tf.train.AdamOptimizer(learning_rate=args.lr),
             grad_norm_clipping=0.5,
             local_q_func=local_q_func,
-            num_units=args.num_units
+            num_units=args.num_units,
+            # reuse = tf.compat.v1.AUTO_REUSE,
         )
         # Create experience buffer
         self.replay_buffer = ReplayBuffer(1e6)
@@ -159,7 +174,15 @@ class MADDPGAgentTrainer(AgentTrainer):
     def preupdate(self):
         self.replay_sample_index = None
 
-    def update(self, agents, t):
+    def update(self, agents, t, replay_index = None):
+        single_nn = replay_index != None
+
+        if single_nn:
+            assert self.agent_index == 0
+        else:
+            replay_index = self.agent_index
+
+
         if len(self.replay_buffer) < self.max_replay_buffer_len: # replay buffer is not large enough
             return
         if not t % 100 == 0:  # only update every 100 steps
@@ -167,22 +190,29 @@ class MADDPGAgentTrainer(AgentTrainer):
 
         self.replay_sample_index = self.replay_buffer.make_index(self.args.batch_size)
         # collect replay sample from all agents
+        # This is silly. We only need to do this once per step, not for each agent. That is true also when we have multiple nn.
         obs_n = []
         obs_next_n = []
         act_n = []
         index = self.replay_sample_index
         for i in range(self.n):
-            obs, act, rew, obs_next, done = agents[i].replay_buffer.sample_index(index)
+            j = (i+replay_index) % self.n if single_nn else i
+            obs, act, rew, obs_next, done = agents[j].replay_buffer.sample_index(index)
             obs_n.append(obs)
             obs_next_n.append(obs_next)
             act_n.append(act)
-        obs, act, rew, obs_next, done = self.replay_buffer.sample_index(index)
+        obs, act, rew, obs_next, done = agents[replay_index].replay_buffer.sample_index(index)
 
-        # train q network
+        # train q network. I don't understand how this matters. Where do we use the q-network????
+        # we have a separate q-network in p_train are they connected because they share the same name in tf?? 
         num_sample = 1
         target_q = 0.0
         for i in range(num_sample):
-            target_act_next_n = [agents[i].p_debug['target_act'](obs_next_n[i]) for i in range(self.n)]
+            if single_nn:
+                target_act_next_n = [self.p_debug['target_act'](obs_next_n[i]) for i in range(self.n)]
+            else:
+                target_act_next_n = [agents[i].p_debug['target_act'](obs_next_n[i]) for i in range(self.n)]
+            
             target_q_next = self.q_debug['target_q_values'](*(obs_next_n + target_act_next_n))
             target_q += rew + self.args.gamma * (1.0 - done) * target_q_next
         target_q /= num_sample
@@ -195,3 +225,41 @@ class MADDPGAgentTrainer(AgentTrainer):
         self.q_update()
 
         return [q_loss, p_loss, np.mean(target_q), np.mean(rew), np.mean(target_q_next), np.std(target_q)]
+
+# work in progress.
+def update_fast(agents, t): # assumes single nn.
+    if len(agents[0].replay_buffer) < agents[0].max_replay_buffer_len: # replay buffer is not large enough
+        return
+    if not t % 100 == 0:  # only update every 100 steps
+        return
+
+    obs_n = []
+    obs_next_n = []
+    act_n = []
+    rew_n = []
+    index = agents[0].replay_buffer.make_index(agents[0].args.batch_size)
+    for i in range(agents[0].n):
+        obs, act, rew, obs_next, done = agents[i].replay_buffer.sample_index(index)
+        obs_n.append(obs)
+        obs_next_n.append(obs_next)
+        act_n.append(act)
+        rew_n.append(rew)
+
+    target_act_next_n = [agents[0].p_debug['target_act'](obs_next_n[i]) for i in range(agents[0].n)]
+    target_q_next = agents[0].q_debug['target_q_values'](*(obs_next_n + target_act_next_n))
+
+    def rotate(l):
+        return l[1:] + l[:1]
+    
+    for i, agent in enumerate(agents):
+        # this be a bit hacky.
+        rotate(obs_n)
+        rotate(act_n)
+        rotate(obs_next_n)
+        rotate(target_act_next_n)
+
+        target_q = rew_n[i] + agents[0].args.gamma * (1.0 - done) * target_q_next
+        q_loss = agents[0].q_train(*(obs_n + act_n + [target_q]))
+        p_loss = agents[0].p_train(*(obs_n + act_n))
+        agents[0].p_update()
+        agents[0].q_update()
