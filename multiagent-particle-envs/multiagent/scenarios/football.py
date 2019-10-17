@@ -7,10 +7,11 @@ class Scenario(BaseScenario):
     def make_world(self):
         world = World()
         world.use_walls = True
+        world.goal_width = 0.20
         # set any world properties first
         world.dim_c = 2
-        num_good_agents = 1
-        num_adversaries = 1
+        num_good_agents = 2
+        num_adversaries = 2
         num_agents = num_adversaries + num_good_agents
         num_landmarks = 1
         # add agents
@@ -20,27 +21,27 @@ class Scenario(BaseScenario):
             agent.collide = True
             agent.silent = True
             agent.adversary = True if i < num_adversaries else False
-            agent.size = 0.075
-            agent.accel = 4.0
+            agent.size = 0.04
+            agent.accel = 1.0
             agent.kicking = True
 
             angle = np.linspace(0, 2*np.pi, 8, endpoint=False)[np.newaxis,:]
             agent.kicks = np.concatenate([np.cos(angle), np.sin(angle)]).T * 2.35
             agent.discrete_action_space = False
-            #agent.accel = 20.0 if agent.adversary else 25.0
-            agent.max_speed = 1.3
+            agent.max_speed = 0.75
+
         # add landmarks
-        
         world.landmarks = [Landmark() for i in range(num_landmarks)]
         landmark = world.landmarks[0]
         landmark.name = 'landmark %d' % i
         landmark.collide = True
         landmark.movable = True
-        landmark.size = 0.075
+        landmark.size = 0.04
         landmark.is_ball = True
+
         # make initial conditions
         def done(agent, world):
-            return abs(world.landmarks[0].state.p_pos[0]) > 1
+            return abs(world.landmarks[0].state.p_pos[0]) > 1 and world.landmarks[0].state.p_pos[1] < world.goal_width 
 
         world.is_scenareo_over = done
         self.reset_world(world)
@@ -57,12 +58,12 @@ class Scenario(BaseScenario):
         # set random initial states
         for agent in world.agents:
             agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
-            
+            agent.state.p_pos[1] * 0.5
             #Deterministic positions for debugging:
             #if agent.adversary:
-            #    agent.state.p_pos = np.array([0.5, 0])
+            #    agent.state.p_pos = np.array([1.0, 0.5])
             #else:
-            #    agent.state.p_pos = np.array([-0.5, 0])
+            #    agent.state.p_pos = np.array([-1.0, -0.5])
 
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
@@ -107,7 +108,11 @@ class Scenario(BaseScenario):
         return main_reward
 
     def agent_reward(self, world):
-        return world.landmarks[0].state.p_vel[0]
+        goal = abs(world.landmarks[0].state.p_pos[0]) > 1 and world.landmarks[0].state.p_pos[1] < world.goal_width
+        r = 0
+        if goal:
+            r += 2 if world.landmarks[0].state.p_pos[0] > 0 else -2
+        return world.landmarks[0].state.p_vel[0] + r
 
     def observation(self, agent, world):
         team_mate_pos = []

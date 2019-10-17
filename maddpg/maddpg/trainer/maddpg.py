@@ -226,12 +226,9 @@ class MADDPGAgentTrainer(AgentTrainer):
 
         return [q_loss, p_loss, np.mean(target_q), np.mean(rew), np.mean(target_q_next), np.std(target_q)]
 
-
-
-
 # work in progress.
 def update_fast(agents, t): # assumes single nn.
-    if len(self.replay_buffer) < self.max_replay_buffer_len: # replay buffer is not large enough
+    if len(agents[0].replay_buffer) < agents[0].max_replay_buffer_len: # replay buffer is not large enough
         return
     if not t % 100 == 0:  # only update every 100 steps
         return
@@ -240,15 +237,16 @@ def update_fast(agents, t): # assumes single nn.
     obs_next_n = []
     act_n = []
     rew_n = []
-    index = agents[0].replay_buffer.make_index(self.args.batch_size)
-    for i in range(self.n):
-        obs, act, rew, obs_next, done = agents[j].replay_buffer.sample_index(index)
+    index = agents[0].replay_buffer.make_index(agents[0].args.batch_size)
+    for i in range(agents[0].n):
+        obs, act, rew, obs_next, done = agents[i].replay_buffer.sample_index(index)
         obs_n.append(obs)
         obs_next_n.append(obs_next)
         act_n.append(act)
         rew_n.append(rew)
 
-    target_act_next_n = [agents[0].p_debug['target_act'](obs_next_n[i]) for i in range(self.n)]
+    target_act_next_n = [agents[0].p_debug['target_act'](obs_next_n[i]) for i in range(agents[0].n)]
+    target_q_next = agents[0].q_debug['target_q_values'](*(obs_next_n + target_act_next_n))
 
     def rotate(l):
         return l[1:] + l[:1]
@@ -260,7 +258,6 @@ def update_fast(agents, t): # assumes single nn.
         rotate(obs_next_n)
         rotate(target_act_next_n)
 
-        target_q_next = agents[0].q_debug['target_q_values'](*(obs_next_n + target_act_next_n))
         target_q = rew_n[i] + agents[0].args.gamma * (1.0 - done) * target_q_next
         q_loss = agents[0].q_train(*(obs_n + act_n + [target_q]))
         p_loss = agents[0].p_train(*(obs_n + act_n))

@@ -6,13 +6,14 @@ import pickle
 
 import maddpg.common.tf_util as U
 from maddpg.trainer.maddpg import MADDPGAgentTrainer
+from maddpg.trainer.maddpg import update_fast
 import tensorflow.contrib.layers as layers
 
 def parse_args():
     parser = argparse.ArgumentParser("Reinforcement Learning experiments for multiagent environments")
     # Environment
     parser.add_argument("--scenario", type=str, default="simple", help="name of the scenario script")
-    parser.add_argument("--max-episode-len", type=int, default=25, help="maximum episode length")
+    parser.add_argument("--max-episode-len", type=int, default=100, help="maximum episode length")
     parser.add_argument("--num-episodes", type=int, default=60000, help="number of episodes")
     parser.add_argument("--num-adversaries", type=int, default=0, help="number of adversaries")
     parser.add_argument("--good-policy", type=str, default="maddpg", help="policy for good agents")
@@ -28,7 +29,7 @@ def parse_args():
     parser.add_argument("--save-rate", type=int, default=1000, help="save model once every time this many episodes are completed")
     parser.add_argument("--load-dir", type=str, default="", help="directory in which training state and model are loaded")
     # Evaluation
-    parser.add_argument("--restore", action="store_true", default=True)
+    parser.add_argument("--restore", action="store_true", default=False)
     parser.add_argument("--display", action="store_true", default=False)
     parser.add_argument("--benchmark", action="store_true", default=False)
     parser.add_argument("--benchmark-iters", type=int, default=100000, help="number of iterations run for benchmarking")
@@ -121,7 +122,7 @@ def train(arglist):
         while True:
             # get action
             if single_nn:
-                action_n = [trainers[0].action(obs) for obs in obs_n]
+                action_n = [trainers[0].action(obs) for obs in obs_n] # this should be done in parallel!
             else:
                 action_n = [agent.action(obs) for agent, obs in zip(trainers,obs_n)]
             
@@ -170,7 +171,9 @@ def train(arglist):
 
             # update all trainers, if not in display or benchmark mode
             loss = None
-            if single_nn:
+            if single_nn and False: #minor speedup and not working at all...
+                loss = update_fast(trainers, train_step)
+            elif single_nn:
                 for index in range(len(trainers)):
                     trainers[0].preupdate()
                     loss = trainers[0].update(trainers, train_step, index)

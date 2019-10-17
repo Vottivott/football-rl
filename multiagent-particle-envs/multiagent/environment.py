@@ -233,7 +233,8 @@ class MultiAgentEnv(gym.Env):
                 # import rendering only if we need it (and don't import for headless machines)
                 #from gym.envs.classic_control import rendering
                 from multiagent import rendering
-                self.viewers[i] = rendering.Viewer(700,700)
+                self.viewers[i] = rendering.Viewer(1000,500)
+                self.viewers[i].set_bounds(-1,1,-0.5,0.5)
 
         # create rendering geometry
         if self.render_geoms is None:
@@ -242,6 +243,15 @@ class MultiAgentEnv(gym.Env):
             from multiagent import rendering
             self.render_geoms = []
             self.render_geoms_xform = []
+            
+            geom = rendering.make_circle(self.world.goal_width)
+            geom.add_attr(rendering.Transform(translation=(1.0, 0.0), scale =(0.1, 1)))
+            self.render_geoms.append(geom)
+
+            geom = rendering.make_circle(self.world.goal_width)
+            geom.add_attr(rendering.Transform(translation=(-1.0, 0.0), scale =(0.1, 1)))
+            self.render_geoms.append(geom)
+
             for entity in self.world.entities:
                 geom = rendering.make_circle(entity.size)
                 xform = rendering.Transform()
@@ -252,7 +262,7 @@ class MultiAgentEnv(gym.Env):
                 geom.add_attr(xform)
                 self.render_geoms.append(geom)
                 self.render_geoms_xform.append(xform)
-
+            
             # add geoms to viewer
             for viewer in self.viewers:
                 viewer.geoms = []
@@ -263,12 +273,14 @@ class MultiAgentEnv(gym.Env):
         for i in range(len(self.viewers)):
             from multiagent import rendering
             # update bounds to center around agent
-            cam_range = 1
+            cam_range_x = 1
+            cam_range_y = 0.5
+
             if self.shared_viewer:
                 pos = np.zeros(self.world.dim_p)
             else:
                 pos = self.agents[i].state.p_pos
-            self.viewers[i].set_bounds(pos[0]-cam_range,pos[0]+cam_range,pos[1]-cam_range,pos[1]+cam_range)
+            self.viewers[i].set_bounds(pos[0]-cam_range_x,pos[0]+cam_range_x,pos[1]-cam_range_y,pos[1]+cam_range_y)
             # update geometry positions
             for e, entity in enumerate(self.world.entities):
                 self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
