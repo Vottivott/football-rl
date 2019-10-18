@@ -22,6 +22,9 @@ def combine_frames_to_video(video_fname):
         filename = pathIn + files[i]
         # reading each files
         img = cv2.imread(filename)
+        if img is None:
+            print("Couldn't make video")
+            return
         height, width, layers = img.shape
         size = (width, height)
 
