@@ -2,7 +2,7 @@ import numpy as np
 import random
 
 class ReplayBuffer(object):
-    def __init__(self, size):
+    def __init__(self, size, batch_size, num_actions, num_obs):
         """Create Prioritized Replay buffer.
 
         Parameters
@@ -14,6 +14,15 @@ class ReplayBuffer(object):
         self._storage = []
         self._maxsize = int(size)
         self._next_idx = 0
+        self.batch_size = batch_size,
+        self.num_actions = num_actions
+        self.num_obs = num_obs
+        
+        self.obs = np.zeros((self.batch_size[0], int(self.num_obs)))
+        self.actions = np.zeros((self.batch_size[0], int(self.num_actions)))
+        self.rewards = np.zeros(self.batch_size[0])
+        self.obs_tp1 = np.zeros((self.batch_size[0], int(self.num_obs)))
+        self.dones = np.zeros(self.batch_size[0])
 
     def __len__(self):
         return len(self._storage)
@@ -43,6 +52,17 @@ class ReplayBuffer(object):
             dones.append(done)
         return np.array(obses_t), np.array(actions), np.array(rewards), np.array(obses_tp1), np.array(dones)
 
+    def sample_index_fast(self, idxes):
+        for i, idx in enumerate(idxes):
+            data = self._storage[idx]
+            obs_t, action, reward, obs_tp1, done = data
+            self.obs[i] = obs_t
+            self.actions[i] = action
+            self.rewards[i] = reward
+            self.obs_tp1[i] = obs_tp1
+            self.dones[i] = done
+        return self.obs, self.actions, self.rewards, self.obs_tp1, self.dones
+    
     def make_index(self, batch_size):
         return [random.randint(0, len(self._storage) - 1) for _ in range(batch_size)]
 

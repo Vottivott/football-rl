@@ -42,7 +42,7 @@ def p_train(make_obs_ph_n, act_space_n, p_index, p_func, q_func, optimizer, grad
         act_ph_n = [act_pdtype_n[i].sample_placeholder([None], name="action"+str(i)) for i in range(len(act_space_n))]
 
         p_input = obs_ph_n[p_index]
-
+        num_actions = int(act_pdtype_n[p_index].param_shape()[0])
         p = p_func(p_input, int(act_pdtype_n[p_index].param_shape()[0]), scope="p_func", num_units=num_units)
         p_func_vars = U.scope_vars(U.absolute_scope_name("p_func"))
 
@@ -79,7 +79,7 @@ def p_train(make_obs_ph_n, act_space_n, p_index, p_func, q_func, optimizer, grad
         target_act_sample = act_pdtype_n[p_index].pdfromflat(target_p).sample()
         target_act = U.function(inputs=[obs_ph_n[p_index]], outputs=target_act_sample)
 
-        return act, train, update_target_p, {'p_values': p_values, 'target_act': target_act}
+        return act, train, update_target_p, {'p_values': p_values, 'target_act': target_act}, num_actions
 
 # And this then the actor?
 # Nope. This is again the qritic. Aha my bad. We do send in the action as well.
@@ -146,7 +146,7 @@ class MADDPGAgentTrainer(AgentTrainer):
             num_units=args.num_units,
             # reuse = tf.compat.v1.AUTO_REUSE,
         )
-        self.act, self.p_train, self.p_update, self.p_debug = p_train(
+        self.act, self.p_train, self.p_update, self.p_debug, num_actions = p_train(
             scope=self.name,
             make_obs_ph_n=obs_ph_n,
             act_space_n=act_space_n,
@@ -159,9 +159,12 @@ class MADDPGAgentTrainer(AgentTrainer):
             num_units=args.num_units,
             # reuse = tf.compat.v1.AUTO_REUSE,
         )
+
         # Create experience buffer
-        self.replay_buffer = ReplayBuffer(1e6)
-        self.max_replay_buffer_len = args.batch_size * args.max_episode_len
+        self.replay_buffer = ReplayBuffer(1e6, args.batch_size, num_actions,  obs_ph_n[0].shape[1])
+        #self.max_replay_buffer_len = args.batch_size * args.max_episode_len
+        self.max_replay_buffer_len = args.batch_size # I mean this is how it should be. This is what we're actually doing...
+
         self.replay_sample_index = None
 
     def action(self, obs):
@@ -226,7 +229,9 @@ class MADDPGAgentTrainer(AgentTrainer):
 
         return [q_loss, p_loss, np.mean(target_q), np.mean(rew), np.mean(target_q_next), np.std(target_q)]
 
-# work in progress.
+# work in progress. And also completly irrelevant... Generating episodes is the slow part by a massive margin.
+#                   Wrong again. I've speed it up. Now we sort of have to do this.
+#                   Atleast fix the quadratic sample index part lol. That is possitivly horrendous.
 def update_fast(agents, t): # assumes single nn.
     if len(agents[0].replay_buffer) < agents[0].max_replay_buffer_len: # replay buffer is not large enough
         return
@@ -239,24 +244,24 @@ def update_fast(agents, t): # assumes single nn.
     rew_n = []
     index = agents[0].replay_buffer.make_index(agents[0].args.batch_size)
     for i in range(agents[0].n):
-        obs, act, rew, obs_next, done = agents[i].replay_buffer.sample_index(index)
+        obs, act, rew, obs_next, done = agents[i].replay_buffer.sample_index_fast(index)
         obs_n.append(obs)
         obs_next_n.append(obs_next)
         act_n.append(act)
         rew_n.append(rew)
 
     target_act_next_n = [agents[0].p_debug['target_act'](obs_next_n[i]) for i in range(agents[0].n)]
-    target_q_next = agents[0].q_debug['target_q_values'](*(obs_next_n + target_act_next_n))
 
     def rotate(l):
         return l[1:] + l[:1]
     
     for i, agent in enumerate(agents):
         # this be a bit hacky.
-        rotate(obs_n)
-        rotate(act_n)
-        rotate(obs_next_n)
-        rotate(target_act_next_n)
+        obs_n = rotate(obs_n)
+        act_n = rotate(act_n)
+        obs_next_n = rotate(obs_next_n)
+        target_act_next_n = rotate(target_act_next_n)
+        target_q_next = agents[0].q_debug['target_q_values'](*(obs_next_n + target_act_next_n))
 
         target_q = rew_n[i] + agents[0].args.gamma * (1.0 - done) * target_q_next
         q_loss = agents[0].q_train(*(obs_n + act_n + [target_q]))
