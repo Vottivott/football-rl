@@ -220,18 +220,17 @@ def train(arglist):
                             message += " \n" + "max_episode_len: %d" % arglist.max_episode_len
                             send_mail_message_with_image("Football RL 2", message, "../../plot.png", image_title="Episode %d" % len(episode_rewards))
                             print("Sent mail")
-                if len(episode_rewards_smooth) > 0:
-                    rename_single_file_in_folder("../../current_episode_num", str(len(episode_rewards)) + " " + str(episode_rewards_smooth[-1]) + " " + str(episode_lengths_smooth[-1]))
 
+                        if len(episode_rewards) % arglist.games_per_expfile == 0:
+                            episode_lengths_smooth.append(sum(episode_lengths[-arglist.games_per_expfile:])/arglist.games_per_expfile)
+                            episode_rewards_smooth.append(sum(episode_rewards[-arglist.games_per_expfile:])/arglist.games_per_expfile)
+                            episode_lengths_smooth_hi.append(max(episode_lengths[-arglist.games_per_expfile:]))
+                            episode_rewards_smooth_hi.append(max(episode_rewards[-arglist.games_per_expfile:]))
+                            episode_lengths_smooth_lo.append(min(episode_lengths[-arglist.games_per_expfile:]))
+                            episode_rewards_smooth_lo.append(min(episode_rewards[-arglist.games_per_expfile:]))
 
-
-                    if len(episode_rewards) % arglist.games_per_expfile == 0:
-                        episode_lengths_smooth.append(sum(episode_lengths[-arglist.games_per_expfile:])/arglist.games_per_expfile)
-                        episode_rewards_smooth.append(sum(episode_rewards[-arglist.games_per_expfile:])/arglist.games_per_expfile)
-                        episode_lengths_smooth_hi.append(max(episode_lengths[-arglist.games_per_expfile:]))
-                        episode_rewards_smooth_hi.append(max(episode_rewards[-arglist.games_per_expfile:]))
-                        episode_lengths_smooth_lo.append(min(episode_lengths[-arglist.games_per_expfile:]))
-                        episode_rewards_smooth_lo.append(min(episode_rewards[-arglist.games_per_expfile:]))
+                        if len(episode_rewards_smooth) > 0:
+                            rename_single_file_in_folder("../../current_episode_num", str(len(episode_rewards)) + " " + str(episode_rewards_smooth[-1]) + " " + str(episode_lengths_smooth[-1]))
 
 
                 # update all trainers, if not in display or benchmark mode
