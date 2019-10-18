@@ -8,8 +8,8 @@ def abline(slope, intercept):
     y_vals = intercept + slope * x_vals
     plt.plot(x_vals, y_vals, '--')
 
-def produce_graph(episode_rewards_smooth, episode_lengths_smooth, episode_rewards_hi, episode_lengths_hi, episode_rewards_lo, episode_lengths_lo, filename):
-    episode_groups = range(len(episode_rewards_smooth))
+def produce_graph(episode_rewards_smooth, episode_lengths_smooth, episode_rewards_hi, episode_lengths_hi, episode_rewards_lo, episode_lengths_lo, filename, games_per_expfile):
+    episode_groups = range(0,len(episode_rewards_smooth)*games_per_expfile,games_per_expfile)
     plt.clf()
     plt.figure(1, figsize=(5, 6 * 3.13), facecolor='whitesmoke')
     num_plots = 2

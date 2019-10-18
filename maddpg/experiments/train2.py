@@ -206,7 +206,7 @@ def train(arglist):
                             save("episode_rewards_smooth", episode_rewards_smooth)
                             save("episode_lengths_smooth", episode_lengths_smooth)
                             print("Saved variables")
-                            produce_graph(episode_rewards_smooth, episode_lengths_smooth, episode_rewards_smooth_hi, episode_lengths_smooth_hi, episode_rewards_smooth_lo, episode_lengths_smooth_lo, "../../plot.png")
+                            produce_graph(episode_rewards_smooth, episode_lengths_smooth, episode_rewards_smooth_hi, episode_lengths_smooth_hi, episode_rewards_smooth_lo, episode_lengths_smooth_lo, "../../plot.png", arglist.games_per_expfile)
                             print("Plotted data")
                             if len(episode_rewards_smooth) > 0:
                                 message = "rew: %.2f    len: %.2f    [%d]" % (episode_rewards_smooth[-1], episode_lengths_smooth[-1], len(episode_rewards))
@@ -328,6 +328,8 @@ def train(arglist):
                             send_mail_message_with_attachment("Football RL - Video", "Episode " + epnum, "../../videos/test_video.mp4", image_title="Episode " + epnum)
                             print("Sent video mail. Waiting 10 minutes.")
                             #time.sleep(60*10)
+                        else:
+                            clear_folder("../../frames/")
 
 
                     worker_t0 = time.time()
