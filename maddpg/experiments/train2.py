@@ -33,7 +33,7 @@ def parse_args():
     # Core training parameters
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate for Adam optimizer")
     parser.add_argument("--gamma", type=float, default=0.95, help="discount factor")
-    parser.add_argument("--batch-size", type=int, default=1024, help="number of episodes to optimize at the same time")
+    parser.add_argument("--batch-size", type=int, default=1024*32, help="number of episodes to optimize at the same time")
     parser.add_argument("--num-units", type=int, default=256, help="number of units in the mlp") #64
     # Checkpointing
     parser.add_argument("--exp-name", type=str, default="football", help="name of the experiment")
@@ -120,15 +120,22 @@ def train(arglist):
         # Initialize
         U.initialize()
 
+        
+
         # Load previous results, if necessary
         if arglist.load_dir == "":
             arglist.load_dir = arglist.save_dir
         if arglist.display or arglist.restore or arglist.benchmark:
             print('Loading previous state...')
             try:
-                U.load_state(arglist.load_dir)
-            except ValueError:
+                try:
+                    U.load_state(arglist.load_dir)
+                except ValueError:
+                    print("No previous state found, starting from the beginning...")
+                    U.save_state(arglist.save_dir, saver=saver)
+            except AttributeError:
                 print("No previous state found, starting from the beginning...")
+                U.save_state(arglist.save_dir, saver=saver)
 
         episode_rewards = [0.0]  # sum of rewards for all agents
         agent_rewards = [[0.0] for _ in range(env.n)]  # individual agent reward
@@ -157,6 +164,12 @@ def train(arglist):
 
         current_frame = 0
 
+        latest_num_exp = 0
+
+        if not arglist.restore:
+            U.save_state(arglist.save_dir, saver=saver)
+            print("Saved initial state")
+
         def save(varname, var):
             fname = varname + ".pkl"
             with open("../../saved_variables/" + fname, 'wb') as fp:
@@ -175,6 +188,8 @@ def train(arglist):
         while True:
             if arglist.multicomputer_main:
                 new_experiences = load_new_experiences()
+                latest_num_exp = len(new_experiences)
+                send_mail = False
                 for exp in new_experiences:
                     obs_n, action_n, rew_n, new_obs_n, done_n, terminal = exp
                     for i, agent in enumerate(trainers):
@@ -190,51 +205,57 @@ def train(arglist):
                         #    a.append(0)
                         episode_step = 0
                         if len(episode_rewards) % 1000 == 0:
-                            save("episode_rewards", episode_rewards)
-                            save("episode_lengths", episode_lengths)
-                            save("episode_rewards_smooth", episode_rewards_smooth)
-                            save("episode_lengths_smooth", episode_lengths_smooth)
-                            print("Saved variables")
-                            produce_graph(episode_rewards_smooth, episode_lengths_smooth, episode_rewards_smooth_hi, episode_lengths_smooth_hi, episode_rewards_smooth_lo, episode_lengths_smooth_lo, "../../plot.png")
-                            print("Plotted data")
-                            if len(episode_rewards_smooth) > 0:
-                                message = "rew: %.2f    len: %.2f    [%d]" % (episode_rewards_smooth[-1], episode_lengths_smooth[-1], len(episode_rewards))
-                            else:
-                                message = ""
-                            message += " \n"
-                            message += " \n" + "team size: %d" % arglist.team_size
-                            message += " \n" + "hidden layer size: %d" % arglist.num_units
-                            message += " \n" + "gamma: %f" % arglist.gamma
-                            message += " \n" + "learning rate: %f" % arglist.lr
-                            message += " \n" + "max_episode_len: %d" % arglist.max_episode_len
-                            send_mail_message_with_image("Football RL 2", message, "../../plot.png", image_title="Episode %d" % len(episode_rewards))
-                            print("Sent mail")
-                if len(episode_rewards_smooth) > 0:
-                    rename_single_file_in_folder("../../current_episode_num", str(len(episode_rewards)) + " " + str(episode_rewards_smooth[-1]) + " " + str(episode_lengths_smooth[-1]))
+                            send_mail = True
 
+                        if len(episode_rewards) % arglist.games_per_expfile == 0:
+                            episode_lengths_smooth.append(sum(episode_lengths[-arglist.games_per_expfile:])/arglist.games_per_expfile)
+                            episode_rewards_smooth.append(sum(episode_rewards[-arglist.games_per_expfile:])/arglist.games_per_expfile)
+                            episode_lengths_smooth_hi.append(max(episode_lengths[-arglist.games_per_expfile:]))
+                            episode_rewards_smooth_hi.append(max(episode_rewards[-arglist.games_per_expfile:]))
+                            episode_lengths_smooth_lo.append(min(episode_lengths[-arglist.games_per_expfile:]))
+                            episode_rewards_smooth_lo.append(min(episode_rewards[-arglist.games_per_expfile:]))
 
+                        if len(episode_rewards_smooth) > 0:
+                            rename_single_file_in_folder("../../current_episode_num", str(len(episode_rewards)) + " " + str(episode_rewards_smooth[-1]) + " " + str(episode_lengths_smooth[-1]))
 
-                    if len(episode_rewards) % arglist.games_per_expfile == 0:
-                        episode_lengths_smooth.append(sum(episode_lengths[-arglist.games_per_expfile:])/arglist.games_per_expfile)
-                        episode_rewards_smooth.append(sum(episode_rewards[-arglist.games_per_expfile:])/arglist.games_per_expfile)
-                        episode_lengths_smooth_hi.append(max(episode_lengths[-arglist.games_per_expfile:]))
-                        episode_rewards_smooth_hi.append(max(episode_rewards[-arglist.games_per_expfile:]))
-                        episode_lengths_smooth_lo.append(min(episode_lengths[-arglist.games_per_expfile:]))
-                        episode_rewards_smooth_lo.append(min(episode_rewards[-arglist.games_per_expfile:]))
-
+                if send_mail:
+                    save("episode_rewards", episode_rewards)
+                    save("episode_lengths", episode_lengths)
+                    save("episode_rewards_smooth", episode_rewards_smooth)
+                    save("episode_lengths_smooth", episode_lengths_smooth)
+                    print("Saved variables")
+                    produce_graph(episode_rewards_smooth, episode_lengths_smooth, episode_rewards_smooth_hi,
+                                  episode_lengths_smooth_hi, episode_rewards_smooth_lo, episode_lengths_smooth_lo,
+                                  "../../plot.png", arglist.games_per_expfile)
+                    print("Plotted data")
+                    if len(episode_rewards_smooth) > 0:
+                        message = "rew: %.2f    len: %.2f    [%d]" % (
+                        episode_rewards_smooth[-1], episode_lengths_smooth[-1], len(episode_rewards))
+                    else:
+                        message = ""
+                    message += " \n"
+                    message += " \n" + "team size: %d" % arglist.team_size
+                    message += " \n" + "hidden layer size: %d" % arglist.num_units
+                    message += " \n" + "gamma: %f" % arglist.gamma
+                    message += " \n" + "learning rate: %f" % arglist.lr
+                    message += " \n" + "max_episode_len: %d" % arglist.max_episode_len
+                    send_mail_message_with_image("Football RL 2", message, "../../plot.png",
+                                                 image_title="Episode %d" % len(episode_rewards))
+                    print("Sent mail")
 
                 # update all trainers, if not in display or benchmark mode
-                loss = None
-                for agent in trainers:
-                    agent.preupdate()
-                for agent in trainers:
-                    loss = agent.update(trainers, train_step)
+                #loss = None
+                #for agent in trainers:
+                #    agent.preupdate()
+                #for agent in trainers:
+                #    loss = agent.update(trainers, train_step)
 
                 U.save_state(arglist.save_dir, saver=saver)
             else:
                 # get action
                 if single_nn:
-                    action_n = [trainers[0].action(obs) for obs in obs_n] # this should be done in parallel!
+                    #action_n = [trainers[0].action(obs) for obs in obs_n] # this should be done in parallel!
+                    action_n = trainers[0].act(obs_n)  # lol that was easy
                 else:
                     action_n = [agent.action(obs) for agent, obs in zip(trainers,obs_n)]
                 
@@ -284,8 +305,9 @@ def train(arglist):
                             worker_current_game_experiences = []
                         
 
-                # increment global step counter
-                train_step += 1
+                if not (arglist.multicomputer_main or arglist.multicomputer_worker):
+                    # increment global step counter
+                    train_step += 1
 
                 # for benchmarking learned policies
                 if arglist.benchmark:
@@ -317,6 +339,8 @@ def train(arglist):
                             send_mail_message_with_attachment("Football RL - Video", "Episode " + epnum, "../../videos/test_video.mp4", image_title="Episode " + epnum)
                             print("Sent video mail. Waiting 10 minutes.")
                             #time.sleep(60*10)
+                        else:
+                            clear_folder("../../frames/")
 
 
                     worker_t0 = time.time()
@@ -330,19 +354,22 @@ def train(arglist):
 
             # update all trainers, if not in display or benchmark mode
             if not arglist.multicomputer_worker:
-                loss = None
-                if single_nn and False: #minor speedup and not working at all...
-                    loss = update_fast(trainers, train_step)
-                elif single_nn:
-                    for index in range(len(trainers)):
-                        trainers[0].preupdate()
-                        loss = trainers[0].update(trainers, train_step, index)
-                else:
-                    for agent in trainers:
-                        agent.preupdate()
-                    for agent in trainers:
-                        loss = agent.update(trainers, train_step)
-
+                num_updates = 1#max(1, int(latest_num_exp / 100))
+                update_t0 = time.time()
+                for i in range(num_updates):
+                    loss = None
+                    if single_nn and True: #minor speedup and not working at all...
+                        loss = update_fast(trainers, train_step)
+                    elif single_nn:
+                        for index in range(len(trainers)):
+                            trainers[0].preupdate()
+                            loss = trainers[0].update(trainers, train_step, index)
+                    else:
+                        for agent in trainers:
+                            agent.preupdate()
+                        for agent in trainers:
+                            loss = agent.update(trainers, train_step)
+                print("Performed %d updates in %.2f seconds" % (num_updates, time.time()-update_t0))
             if not arglist.multicomputer_main:
                 # save model, display training output
                 if terminal and (len(episode_rewards) % arglist.save_rate == 0):
