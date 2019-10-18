@@ -125,7 +125,10 @@ def train(arglist):
             arglist.load_dir = arglist.save_dir
         if arglist.display or arglist.restore or arglist.benchmark:
             print('Loading previous state...')
-            U.load_state(arglist.load_dir)
+            try:
+                U.load_state(arglist.load_dir)
+            except ValueError:
+                print("No previous state found, starting from the beginning...")
 
         episode_rewards = [0.0]  # sum of rewards for all agents
         agent_rewards = [[0.0] for _ in range(env.n)]  # individual agent reward
