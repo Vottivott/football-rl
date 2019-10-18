@@ -53,7 +53,7 @@ def parse_args():
     parser.add_argument("--autoemail", action="store_true", default=False)
     parser.add_argument("--multicomputer-main", action="store_true", default=False)
     parser.add_argument("--multicomputer-worker", action="store_true", default=False)
-    parser.add_argument("--team-size", type=int, default=5, help="size of each team")
+    parser.add_argument("--team-size", type=int, default=3, help="size of each team")
 
     return parser.parse_args()
 
@@ -196,11 +196,12 @@ def train(arglist):
                             else:
                                 message = ""
                             message += " \n"
+                            message += " \n" + "team size: %d" % arglist.team_size
                             message += " \n" + "hidden layer size: %d" % arglist.num_units
                             message += " \n" + "gamma: %f" % arglist.gamma
                             message += " \n" + "learning rate: %f" % arglist.lr
                             message += " \n" + "max_episode_len: %d" % arglist.max_episode_len
-                            send_mail_message_with_image("Football RL", message, "../../plot.png", image_title="Episode %d" % len(episode_rewards))
+                            send_mail_message_with_image("Football RL 2", message, "../../plot.png", image_title="Episode %d" % len(episode_rewards))
                             print("Sent mail")
                 if len(episode_rewards_smooth) > 0:
                     rename_single_file_in_folder("../../current_episode_num", str(len(episode_rewards)) + " " + str(episode_rewards_smooth[-1]) + " " + str(episode_lengths_smooth[-1]))
