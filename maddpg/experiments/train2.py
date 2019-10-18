@@ -202,8 +202,8 @@ def train(arglist):
                             message += " \n" + "max_episode_len: %d" % arglist.max_episode_len
                             send_mail_message_with_image("Football RL", message, "../../plot.png", image_title="Episode %d" % len(episode_rewards))
                             print("Sent mail")
-                            if len(episode_rewards_smooth) > 0:
-                                rename_single_file_in_folder("../../current_episode_num", str(len(episode_rewards)) + " " + str(episode_rewards_smooth[-1]) + " " + str(episode_lengths_smooth[-1]))
+                if len(episode_rewards_smooth) > 0:
+                    rename_single_file_in_folder("../../current_episode_num", str(len(episode_rewards)) + " " + str(episode_rewards_smooth[-1]) + " " + str(episode_lengths_smooth[-1]))
 
 
 
