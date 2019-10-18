@@ -4,14 +4,14 @@ from multiagent.scenario import BaseScenario
 
 
 class Scenario(BaseScenario):
-    def make_world(self):
+    def make_world(self, team_size = 2):
         world = World()
         world.use_walls = True
         world.goal_width = 0.20
         # set any world properties first
         world.dim_c = 2
-        num_good_agents = 2
-        num_adversaries = 2
+        num_good_agents = team_size
+        num_adversaries = team_size
         num_agents = num_adversaries + num_good_agents
         num_landmarks = 1
         # add agents

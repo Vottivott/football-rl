@@ -194,8 +194,8 @@ def train(arglist):
                     video_maker.save_frame(episode_step)
                 if terminal and len(episode_rewards) % 5 == 0:
                     if arglist.video:
-                        clear_folder("../../frames/")
                         video_maker.combine_frames_to_video("../../videos/test_video.mp4")
+                        clear_folder("../../frames/")
                     t0 = time.time()
                     try:
                         U.load_state(arglist.load_dir)
