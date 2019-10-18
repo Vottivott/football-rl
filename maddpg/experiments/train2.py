@@ -127,7 +127,7 @@ def train(arglist):
             print('Loading previous state...')
             try:
                 U.load_state(arglist.load_dir)
-            except ValueError:
+            except AttributeError:
                 print("No previous state found, starting from the beginning...")
 
         episode_rewards = [0.0]  # sum of rewards for all agents
