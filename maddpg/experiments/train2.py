@@ -10,7 +10,7 @@ from maddpg.trainer.maddpg import update_fast
 import tensorflow.contrib.layers as layers
 
 import video_maker
-from folder_tools import clear_folder, rename_single_file_in_folder, read_name_of_single_file_in_folder
+from folder_tools import clear_folder, rename_single_file_in_folder, read_name_of_single_file_in_folder, has_file
 
 from experience_loader import load_new_experiences
 from emailer import send_mail_message_with_image, send_mail_message_with_attachment
@@ -262,6 +262,9 @@ def train(arglist):
                     agent_info.append([[]])
                     if arglist.multicomputer_worker:
                         if len(episode_rewards) % arglist.games_per_expfile == 0 and not arglist.display:
+                            if has_file("../../kill_workers/"):
+                                print("Worker killed")
+                                exit(0)
                             fname = datetime.datetime.now().strftime('%Y-%m-%d %H.%M.%S.%f') + ".pkl"
                             with open("../../worker_experiences/" + fname, 'wb') as fp:
                                 print("\n[%d] Finished %d games in %.2f seconds" % (len(episode_rewards), arglist.games_per_expfile, time.time() - worker_t0))

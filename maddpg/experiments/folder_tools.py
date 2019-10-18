@@ -2,6 +2,9 @@ from os import listdir
 import os
 from os.path import isfile, join
 
+def has_file(path):
+    files = [f for f in listdir(path) if isfile(join(path, f))]
+    return len(files) > 0
 
 def clear_folder(path): #including last '/'
     files = [f for f in listdir(path) if isfile(join(path, f))]
