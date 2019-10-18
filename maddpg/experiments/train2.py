@@ -164,6 +164,8 @@ def train(arglist):
 
         current_frame = 0
 
+        latest_num_exp = 0
+
         if not arglist.restore:
             U.save_state(arglist.save_dir, saver=saver)
             print("Saved initial state")
@@ -186,6 +188,7 @@ def train(arglist):
         while True:
             if arglist.multicomputer_main:
                 new_experiences = load_new_experiences()
+                latest_num_exp = len(new_experiences)
                 for exp in new_experiences:
                     obs_n, action_n, rew_n, new_obs_n, done_n, terminal = exp
                     for i, agent in enumerate(trainers):
@@ -234,11 +237,11 @@ def train(arglist):
 
 
                 # update all trainers, if not in display or benchmark mode
-                loss = None
-                for agent in trainers:
-                    agent.preupdate()
-                for agent in trainers:
-                    loss = agent.update(trainers, train_step)
+                #loss = None
+                #for agent in trainers:
+                #    agent.preupdate()
+                #for agent in trainers:
+                #    loss = agent.update(trainers, train_step)
 
                 U.save_state(arglist.save_dir, saver=saver)
             else:
@@ -295,8 +298,9 @@ def train(arglist):
                             worker_current_game_experiences = []
                         
 
-                # increment global step counter
-                train_step += 1
+                if not (arglist.multicomputer_main or arglist.multicomputer_worker):
+                    # increment global step counter
+                    train_step += 1
 
                 # for benchmarking learned policies
                 if arglist.benchmark:
@@ -342,20 +346,23 @@ def train(arglist):
                 continue
 
             # update all trainers, if not in display or benchmark mode
-            if not arglist.multicomputer_worker:
-                loss = None
-                if single_nn and True: #minor speedup and not working at all...
-                    loss = update_fast(trainers, train_step)
-                elif single_nn:
-                    for index in range(len(trainers)):
-                        trainers[0].preupdate()
-                        loss = trainers[0].update(trainers, train_step, index)
-                else:
-                    for agent in trainers:
-                        agent.preupdate()
-                    for agent in trainers:
-                        loss = agent.update(trainers, train_step)
-
+            num_updates = max(1, int(latest_num_exp / 100))
+            update_t0 = time.time()
+            for i in range(num_updates):
+                if not arglist.multicomputer_worker:
+                    loss = None
+                    if single_nn and True: #minor speedup and not working at all...
+                        loss = update_fast(trainers, train_step)
+                    elif single_nn:
+                        for index in range(len(trainers)):
+                            trainers[0].preupdate()
+                            loss = trainers[0].update(trainers, train_step, index)
+                    else:
+                        for agent in trainers:
+                            agent.preupdate()
+                        for agent in trainers:
+                            loss = agent.update(trainers, train_step)
+            print("Performed %d updates in %.2f seconds" % (num_updates, time.time()-update_t0))
             if not arglist.multicomputer_main:
                 # save model, display training output
                 if terminal and (len(episode_rewards) % arglist.save_rate == 0):
