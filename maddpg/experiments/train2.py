@@ -33,7 +33,7 @@ def parse_args():
     # Core training parameters
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate for Adam optimizer")
     parser.add_argument("--gamma", type=float, default=0.95, help="discount factor")
-    parser.add_argument("--batch-size", type=int, default=1024, help="number of episodes to optimize at the same time")
+    parser.add_argument("--batch-size", type=int, default=1024*32, help="number of episodes to optimize at the same time")
     parser.add_argument("--num-units", type=int, default=256, help="number of units in the mlp") #64
     # Checkpointing
     parser.add_argument("--exp-name", type=str, default="football", help="name of the experiment")
@@ -234,7 +234,8 @@ def train(arglist):
             else:
                 # get action
                 if single_nn:
-                    action_n = [trainers[0].action(obs) for obs in obs_n] # this should be done in parallel!
+                    #action_n = [trainers[0].action(obs) for obs in obs_n] # this should be done in parallel!
+                    action_n = trainers[0].act(obs_n)  # lol that was easy
                 else:
                     action_n = [agent.action(obs) for agent, obs in zip(trainers,obs_n)]
                 
@@ -331,7 +332,7 @@ def train(arglist):
             # update all trainers, if not in display or benchmark mode
             if not arglist.multicomputer_worker:
                 loss = None
-                if single_nn and False: #minor speedup and not working at all...
+                if single_nn and True: #minor speedup and not working at all...
                     loss = update_fast(trainers, train_step)
                 elif single_nn:
                     for index in range(len(trainers)):
