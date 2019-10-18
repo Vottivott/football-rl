@@ -4,7 +4,7 @@ from multiagent.scenario import BaseScenario
 
 
 class Scenario(BaseScenario):
-    def make_world(self, team_size = 2):
+    def make_world(self, team_size = 1):
         world = World()
         world.use_walls = True
         world.goal_width = 0.20
@@ -21,8 +21,8 @@ class Scenario(BaseScenario):
             agent.collide = True
             agent.silent = True
             agent.adversary = True if i < num_adversaries else False
-            agent.size = 0.04
-            agent.accel = 1.0
+            agent.size = 0.06
+            agent.accel = 2.0
             agent.kicking = True
 
             angle = np.linspace(0, 2*np.pi, 16, endpoint=False)[np.newaxis,:]
@@ -36,7 +36,7 @@ class Scenario(BaseScenario):
         landmark.name = 'landmark %d' % i
         landmark.collide = True
         landmark.movable = True
-        landmark.size = 0.04
+        landmark.size = 0.06
         landmark.is_ball = True
 
         # make initial conditions
@@ -111,6 +111,7 @@ class Scenario(BaseScenario):
         goal = abs(world.landmarks[0].state.p_pos[0]) > 1 and world.landmarks[0].state.p_pos[1] < world.goal_width
         r = 0
         if goal:
+            print("GOAL!")
             r += 2 if world.landmarks[0].state.p_pos[0] > 0 else -2
         return world.landmarks[0].state.p_vel[0] + r
 

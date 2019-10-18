@@ -104,14 +104,15 @@ def train(arglist):
             arglist.load_dir = arglist.save_dir
         if arglist.display or arglist.restore or arglist.benchmark:
             print('Loading previous state...')
-            U.load_state(arglist.load_dir)
+            #U.load_state(arglist.load_dir)
+            U.load_state(arglist.load_dir+ '#'+"{:06d}".format(3))
 
         episode_rewards = [0.0]  # sum of rewards for all agents
         agent_rewards = [[0.0] for _ in range(env.n)]  # individual agent reward
         final_ep_rewards = []  # sum of rewards for training curve
         final_ep_ag_rewards = []  # agent rewards for training curve
         agent_info = [[[]]]  # placeholder for benchmarking info
-        saver = tf.train.Saver()
+        saver = tf.train.Saver(max_to_keep=None)
         obs_n = env.reset()
         episode_step = 0
         train_step = 0
@@ -166,7 +167,8 @@ def train(arglist):
 
             # for displaying learned policies
             if arglist.display:
-                time.sleep(0.02)
+
+                time.sleep(0.08)
                 env.render()
                 continue
 
@@ -186,7 +188,8 @@ def train(arglist):
 
             # save model, display training output
             if terminal and (len(episode_rewards) % arglist.save_rate == 0):
-                U.save_state(arglist.save_dir, saver=saver)
+                U.save_state(arglist.save_dir+'#'+"{:06d}".format(len(episode_rewards)//arglist.save_rate), saver=saver)
+                #U.save_state(arglist.save_dir, saver=saver)
                 # print statement depends on whether or not there are adversaries
                 if num_adversaries == 0 and False:
                     print("steps: {}, episodes: {}, mean episode reward: {}, time: {}".format(

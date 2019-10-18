@@ -130,7 +130,6 @@ class World(object):
         # update agent state
         for agent in self.agents:
             self.update_agent_state(agent)
-
         self.collision_res()
 
     # gather agent action forces
@@ -154,12 +153,22 @@ class World(object):
                     has_kick = True
 
         return p_force, k_force, has_kick
+
     
     def collision_res(self):
+        def invert_permutation(p):
+            s = np.empty(p.size, p.dtype)
+            s[p] = np.arange(p.size)
+            return s
+        
         s = [e.state for e in self.entities]
         p = np.array([ss.p_pos for ss in s])
         v = np.array([ss.p_vel for ss in s])
         # we assume the radius is the same for everything now. i don't care.
+        perm = np.append(np.random.permutation(len(s)-1),[len(s)-1])
+        v = v[perm]
+        p = p[perm]
+
         r = self.entities[0].size
         p_old = p.copy()
         v_old = v.copy()
@@ -173,14 +182,16 @@ class World(object):
                     delta = p_old-p_old[i]
                     c = 0.5 * (p_old[i] + p_old)
                     dnorm = delta/d[i][:,None]
-                    p1 = c + r*dnorm
-                    v_proj = np.einsum('ij,ij->i', v_old, dnorm)[:,None] * dnorm
-                    v_proj_i = np.einsum('ij,ij->i', v_old[i,None], dnorm)[:,None] * dnorm
+                    v_dot = np.einsum('ij,ij->i', v_old, dnorm)
+                    v_proj = v_dot[:,None] * dnorm
+                    v_i_dot = np.einsum('ij,ij->i', v_old[i,None], dnorm)
+                    v_proj_i = v_i_dot[:,None] * dnorm
                     v1 = (v_old - v_proj) + v_proj_i
+                    passed = v_dot > 0 
+                    p1 = c + r*dnorm
                     #print('\n\ni:',i,'\n proj:', v_proj, '\nv: ', v,'\n v1:', v1, '\n diff:', v_old - v_proj,'\n proj_i ', v_proj_i, '\ndnorm,',dnorm)
                     p = np.where(coll[:, None], p1, p)
                     v = np.where(coll[:, None], v1, v)
-                    
             #print('equality:',np.equal(v_old,v))
         # abusing p_old insead of copying p to it again.
         np.clip(p[:,1],-0.5+r,0.5-r,p_old[:,1])  # y-walls
@@ -190,10 +201,16 @@ class World(object):
         else:
             p_old[-1, 0] = p[-1, 0]
 
+
+
         # if the clipping changes the y coordinate we should flip the velocity vertically.
         # and same thing for the x coord.
         v[:, 0] = np.where(p[:,0] == p_old[:, 0], v[:,0], -v[:,0])
         v[:, 1] = np.where(p[:,1] == p_old[:, 1], v[:,1], -v[:,1])
+
+        perm_inv = invert_permutation(perm)
+        v = v[perm_inv]
+        p_old = p_old[perm_inv]
 
         for i, s in enumerate(self.entities):
             s.state.p_pos = p_old[i]
