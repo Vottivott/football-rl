@@ -354,7 +354,7 @@ def train(arglist):
 
             # update all trainers, if not in display or benchmark mode
             if not arglist.multicomputer_worker:
-                num_updates = max(1, int(latest_num_exp / 100))
+                num_updates = 1#max(1, int(latest_num_exp / 100))
                 update_t0 = time.time()
                 for i in range(num_updates):
                     loss = None
