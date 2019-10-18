@@ -53,7 +53,8 @@ def parse_args():
     parser.add_argument("--autoemail", action="store_true", default=False)
     parser.add_argument("--multicomputer-main", action="store_true", default=False)
     parser.add_argument("--multicomputer-worker", action="store_true", default=False)
-    parser.add_argument("--team-size", type=int, default=3, help="size of each team")
+    parser.add_argument("--team-size", type=int, default=2, help="size of each team")
+    parser.add_argument("--games-per-expfile", type=int, default=50)
 
     return parser.parse_args()
 
@@ -141,6 +142,8 @@ def train(arglist):
         worker_current_game_experiences = []
         worker_t0 = time.time()
 
+        last_video_t = time.time() - 60*10
+
         episode_lengths = [0]
         episode_rewards_smooth = []
         episode_lengths_smooth = []
@@ -177,13 +180,13 @@ def train(arglist):
                         episode_rewards[-1] += abs(rew)
                         #agent_rewards[i][-1] += abs(rew)
                     episode_step += 1
-                    if terminal:
+                    if terminal or episode_step == arglist.max_episode_len:
                         episode_lengths.append(episode_step)
                         episode_rewards.append(0)
                         #for a in agent_rewards:
                         #    a.append(0)
                         episode_step = 0
-                        if len(episode_rewards) % 5000 == 0:
+                        if len(episode_rewards) % 1000 == 0:
                             save("episode_rewards", episode_rewards)
                             save("episode_lengths", episode_lengths)
                             save("episode_rewards_smooth", episode_rewards_smooth)
@@ -208,13 +211,13 @@ def train(arglist):
 
 
 
-                    if len(episode_rewards) % 200 == 0:
-                        episode_lengths_smooth.append(sum(episode_lengths[-200:])/200.0)
-                        episode_rewards_smooth.append(sum(episode_rewards[-200:])/200.0)
-                        episode_lengths_smooth_hi.append(max(episode_lengths[-200:]))
-                        episode_rewards_smooth_hi.append(max(episode_rewards[-200:]))
-                        episode_lengths_smooth_lo.append(min(episode_lengths[-200:]))
-                        episode_rewards_smooth_lo.append(min(episode_rewards[-200:]))
+                    if len(episode_rewards) % arglist.games_per_expfile == 0:
+                        episode_lengths_smooth.append(sum(episode_lengths[-arglist.games_per_expfile:])/arglist.games_per_expfile)
+                        episode_rewards_smooth.append(sum(episode_rewards[-arglist.games_per_expfile:])/arglist.games_per_expfile)
+                        episode_lengths_smooth_hi.append(max(episode_lengths[-arglist.games_per_expfile:]))
+                        episode_rewards_smooth_hi.append(max(episode_rewards[-arglist.games_per_expfile:]))
+                        episode_lengths_smooth_lo.append(min(episode_lengths[-arglist.games_per_expfile:]))
+                        episode_rewards_smooth_lo.append(min(episode_rewards[-arglist.games_per_expfile:]))
 
 
                 # update all trainers, if not in display or benchmark mode
@@ -258,10 +261,10 @@ def train(arglist):
                         a.append(0)
                     agent_info.append([[]])
                     if arglist.multicomputer_worker:
-                        if len(episode_rewards) % 200 == 0 and not arglist.display:
+                        if len(episode_rewards) % arglist.games_per_expfile == 0 and not arglist.display:
                             fname = datetime.datetime.now().strftime('%Y-%m-%d %H.%M.%S.%f') + ".pkl"
                             with open("../../worker_experiences/" + fname, 'wb') as fp:
-                                print("\n[%d] Finished 200 games in %.2f seconds" % (len(episode_rewards), time.time() - worker_t0))
+                                print("\n[%d] Finished %d games in %.2f seconds" % (len(episode_rewards), arglist.games_per_expfile, time.time() - worker_t0))
                                 pickle.dump(worker_current_game_experiences, fp)
                                 print("Saved experience file " + fname)
                                 print('Loading latest networks...')
@@ -292,20 +295,24 @@ def train(arglist):
 
             # for displaying learned policies
             if arglist.display:
-                time.sleep(0.02)
+                #time.sleep(0.02)
                 env.render()
                 if arglist.video:
                     current_frame += 1
                     video_maker.save_frame(current_frame)
                 if terminal and len(episode_rewards) % 7 == 0:
                     if arglist.video:
-                        video_maker.combine_frames_to_video("../../videos/test_video.mp4")
-                        clear_folder("../../frames/")
-                        current_frame = 0
-                        epnum = read_name_of_single_file_in_folder("../../current_episode_num")
-                        send_mail_message_with_attachment("Football RL - Video", "Episode " + epnum, "../../videos/test_video.mp4", image_title="Episode " + epnum)
-                        print("Sent video mail. Waiting 10 minutes.")
-                        time.sleep(60*10)
+                        if time.time() - last_video_t > 60*10:
+                            last_video_t = time.time()
+                            video_maker.combine_frames_to_video("../../videos/test_video.mp4")
+                            clear_folder("../../frames/")
+                            current_frame = 0
+                            epnum = read_name_of_single_file_in_folder("../../current_episode_num")
+                            send_mail_message_with_attachment("Football RL - Video", "Episode " + epnum, "../../videos/test_video.mp4", image_title="Episode " + epnum)
+                            print("Sent video mail. Waiting 10 minutes.")
+                            #time.sleep(60*10)
+
+
                     worker_t0 = time.time()
                     try:
                         U.load_state(arglist.load_dir)
