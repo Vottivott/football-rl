@@ -353,10 +353,10 @@ def train(arglist):
                 continue
 
             # update all trainers, if not in display or benchmark mode
-            num_updates = max(1, int(latest_num_exp / 100))
-            update_t0 = time.time()
-            for i in range(num_updates):
-                if not arglist.multicomputer_worker:
+            if not arglist.multicomputer_worker:
+                num_updates = max(1, int(latest_num_exp / 100))
+                update_t0 = time.time()
+                for i in range(num_updates):
                     loss = None
                     if single_nn and True: #minor speedup and not working at all...
                         loss = update_fast(trainers, train_step)
@@ -369,7 +369,7 @@ def train(arglist):
                             agent.preupdate()
                         for agent in trainers:
                             loss = agent.update(trainers, train_step)
-            print("Performed %d updates in %.2f seconds" % (num_updates, time.time()-update_t0))
+                print("Performed %d updates in %.2f seconds" % (num_updates, time.time()-update_t0))
             if not arglist.multicomputer_main:
                 # save model, display training output
                 if terminal and (len(episode_rewards) % arglist.save_rate == 0):
