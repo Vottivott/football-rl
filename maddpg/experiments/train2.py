@@ -120,15 +120,22 @@ def train(arglist):
         # Initialize
         U.initialize()
 
+        
+
         # Load previous results, if necessary
         if arglist.load_dir == "":
             arglist.load_dir = arglist.save_dir
         if arglist.display or arglist.restore or arglist.benchmark:
             print('Loading previous state...')
             try:
-                U.load_state(arglist.load_dir)
+                try:
+                    U.load_state(arglist.load_dir)
+                except ValueError:
+                    print("No previous state found, starting from the beginning...")
+                    U.save_state(arglist.save_dir, saver=saver)
             except AttributeError:
                 print("No previous state found, starting from the beginning...")
+                U.save_state(arglist.save_dir, saver=saver)
 
         episode_rewards = [0.0]  # sum of rewards for all agents
         agent_rewards = [[0.0] for _ in range(env.n)]  # individual agent reward
@@ -156,6 +163,10 @@ def train(arglist):
         episode_lengths_smooth_lo = []
 
         current_frame = 0
+
+        if not arglist.restore:
+            U.save_state(arglist.save_dir, saver=saver)
+            print("Saved initial state")
 
         def save(varname, var):
             fname = varname + ".pkl"

@@ -11,7 +11,7 @@ def combine_frames_to_video(video_fname):
 
     pathIn = '../../frames/'
     pathOut = video_fname
-    fps = int(1.0/0.02)
+    fps = int(1.0/0.04)
     frame_array = []
     files = sorted([f for f in os.listdir(pathIn) if isfile(join(pathIn, f))])
     # for sorting the file names properly
