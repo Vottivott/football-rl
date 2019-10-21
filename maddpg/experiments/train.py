@@ -21,7 +21,7 @@ def parse_args():
     # Core training parameters
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate for Adam optimizer")
     parser.add_argument("--gamma", type=float, default=0.95, help="discount factor")
-    parser.add_argument("--batch-size", type=int, default=1024*32, help="number of episodes to optimize at the same time")
+    parser.add_argument("--batch-size", type=int, default=1024*8, help="number of episodes to optimize at the same time")
     parser.add_argument("--num-units", type=int, default=256, help="number of units in the mlp") #64
     # Checkpointing
     parser.add_argument("--exp-name", type=str, default=None, help="name of the experiment")
@@ -35,6 +35,7 @@ def parse_args():
     parser.add_argument("--benchmark-iters", type=int, default=100000, help="number of iterations run for benchmarking")
     parser.add_argument("--benchmark-dir", type=str, default="./benchmark_files/", help="directory where benchmark data is saved")
     parser.add_argument("--plots-dir", type=str, default="./learning_curves/", help="directory where plot data is saved")
+    parser.add_argument("--team-size", type=int, default=2, help="size of each team")
     return parser.parse_args()
 
 def mlp_model(input, num_outputs, scope, reuse=False, num_units=64, rnn_cell=None):
@@ -56,7 +57,7 @@ def make_env(scenario_name, arglist, benchmark=False):
     # load scenario from script
     scenario = scenarios.load(scenario_name + ".py").Scenario()
     # create world
-    world = scenario.make_world()
+    world = scenario.make_world(arglist.team_size)
     # create multiagent environment
     def done_callback(agent, world):
         if hasattr(world, 'is_scenareo_over'):
