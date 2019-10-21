@@ -29,6 +29,7 @@ class Scenario(BaseScenario):
             agent.kicks = np.concatenate([np.cos(angle), np.sin(angle)]).T * 2.35
             agent.discrete_action_space = False
             agent.max_speed = 0.75
+            agent.is_ball = False
 
         # add landmarks
         world.landmarks = [Landmark() for i in range(num_landmarks)]
@@ -38,10 +39,11 @@ class Scenario(BaseScenario):
         landmark.movable = True
         landmark.size = 0.06
         landmark.is_ball = True
+        landmark.adversary = -1
 
         # make initial conditions
         def done(agent, world):
-            return abs(world.landmarks[0].state.p_pos[0]) > 1 and world.landmarks[0].state.p_pos[1] < world.goal_width 
+            return self.is_goal(world) 
 
         world.is_scenareo_over = done
         self.reset_world(world)
@@ -57,8 +59,8 @@ class Scenario(BaseScenario):
             landmark.color = np.array([0.25, 0.25, 0.25])
         # set random initial states
         for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
-            agent.state.p_pos[1] *= 0.5
+            agent.state.p_pos= [np.random.uniform(-(1-agent.size), +(1-agent.size), 1)[0],
+                                np.random.uniform(-(0.5-agent.size), +(0.5-agent.size), 1)[0]]
             #Deterministic positions for debugging:
             #if agent.adversary:
             #    agent.state.p_pos = np.array([1.0, 0.5])
@@ -107,13 +109,84 @@ class Scenario(BaseScenario):
         main_reward = self.agent_reward(world) if agent.adversary else -self.agent_reward(world)
         return main_reward
 
+    def is_goal(self, world):
+        return abs(world.landmarks[0].state.p_pos[0]) > 1-world.landmarks[0].size and abs(world.landmarks[0].state.p_pos[1]) < world.goal_width - world.landmarks[0].size
+
     def agent_reward(self, world):
-        goal = abs(world.landmarks[0].state.p_pos[0]) > 1 and world.landmarks[0].state.p_pos[1] < world.goal_width
+        goal = self.is_goal(world)
         r = 0
         if goal:
-            print("GOAL!")
-            r += 2 if world.landmarks[0].state.p_pos[0] > 0 else -2
+            # very large reward as to make sure that it's better to sometimes score than always end up in the corner 
+            # not sure if it's important.
+            r += 100 if world.landmarks[0].state.p_pos[0] > 0 else -100
         return world.landmarks[0].state.p_vel[0] + r
+
+    def ray_circle_intersection(p, ray, rad):
+        p_proj_dist = np.dot(p, ray)
+        if p_proj_dist < 0:
+            return False #we should still return and reuse this for the opposite ray. But what evs.
+        d2 = np.dot(p, p) - p_proj_dist * p_proj_dist
+        if d2 > rad:
+             return False
+        thc = np.sqrt(rad - d2)
+        return p_proj_dist - thc
+
+    def wall_intersect(v, d):
+        return d/v
+
+    def to_polar_form(p, v):
+        dist = np.sqrt(np.dot(p, p))
+        dir = p / dist
+        delta_d = np.dot(v, dir)
+        v_orth = v - delta_d * v 
+        delta_theta = v_orth * dist 
+        return delta_d, delta_theta
+
+    #hmm if we do this we do this the teamsize is not important. We can train them first on small teams and then increase size!
+    def observation_radar(self, agent, world):
+        num_radars = 16
+        angles = np.linspace(0, 2*np.pi, num_radars, endpoint=False)[np.newaxis,:]
+        rays   = np.concatenate([np.cos(angle), np.sin(angle)]).T
+        pos = agent.state.p_pos
+        vel = agent.state.p_vel
+        #distance, velocity in polar form, if it's a team_mate or not, is it a y-wall, is it a x-wall, if it's a ball
+        sights[num_radars] = [float("inf"),0,0, 0, 0, 0] * num_radars
+        for other in world.entities:
+            if other is agent: continue
+            p = other.state.p_pos-pos
+            v = other.state.p_vel   #should this be relative as well?? For shooting probably not, for moving probably..
+
+            if agent.adversary:
+                p[0] *= -1
+                v[0] *= -1
+
+            for i in range(len(rays)):
+                distance = ray_circle_intersection(p,rays[i], other.size)
+                if sights[i][0] > distance:
+                    sights[i] = [distance, *to_polar_form(v,p), other.adversary == agent.adversary, 0, 0, other.is_ball]
+
+        for i in range(len(rays)):
+            distance = wall_intersect(0.5-pos[1], rays[i][1])
+            if sights[i][0] > distance:
+                sights[i] = [distance, 0, 0, 0, 1, 0]
+            distance = wall_intersect(-0.5-pos[1], rays[i][1])
+            if sights[i][0] > distance:
+                sights[i] = [distance, 0, 0, 0, 1, 0]
+            distance = wall_intersect(1-pos[0], rays[i][0])
+            if sights[i][0] > distance:
+                sights[i] = [distance, 0, 0, 0, 1, 1]
+            distance = wall_intersect(-1-pos[0], rays[i][0])
+            if sights[i][0] > distance:
+                sights[i] = [distance, 0, 0, 0, 1, 1]
+        
+        if agent.adversary: 
+            pos[0] *= -1
+            vel[0] *= -1
+        
+        return np.concatenate(sights + vel + pos)
+            
+
+
 
     def observation(self, agent, world):
         team_mate_pos = []

@@ -85,6 +85,7 @@ def get_trainers(env, num_adversaries, obs_shape_n, arglist):
     return trainers
 
 
+
 def train(arglist):
     with U.single_threaded_session():
         # Create environment
@@ -105,7 +106,7 @@ def train(arglist):
         if arglist.display or arglist.restore or arglist.benchmark:
             print('Loading previous state...')
             #U.load_state(arglist.load_dir)
-            U.load_state(arglist.load_dir+ '#'+"{:06d}".format(3))
+            U.load_state(arglist.load_dir+ '#'+"{:06d}".format(60))
 
         episode_rewards = [0.0]  # sum of rewards for all agents
         agent_rewards = [[0.0] for _ in range(env.n)]  # individual agent reward

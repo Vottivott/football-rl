@@ -79,6 +79,7 @@ class Agent(Entity):
         # script behavior to execute
         self.action_callback = None
 
+
 # multi-agent world
 class World(object):
     def __init__(self):
@@ -93,11 +94,14 @@ class World(object):
         self.dim_color = 3
         # simulation timestep
         self.dt = 0.1
+        self.num_physics_steps = 5
+        self.dt/= self.num_physics_steps
         # physical damping
         self.damping = 0.25
         # contact response parameters
         self.contact_force = 1e+2
         self.contact_margin = 1e-3
+
 
     # return all entities in the world
     @property
@@ -113,9 +117,9 @@ class World(object):
     @property
     def scripted_agents(self):
         return [agent for agent in self.agents if agent.action_callback is not None]
-
+    
     # update state of the world
-    def step(self):
+    def step_(self):
         # set actions for scripted agents 
         for agent in self.scripted_agents:
             agent.action = agent.action_callback(agent, self)
@@ -131,6 +135,10 @@ class World(object):
         for agent in self.agents:
             self.update_agent_state(agent)
         self.collision_res()
+    
+    def step(self):
+        for i in range(0, self.num_physics_steps):
+            self.step_()
 
     # gather agent action forces
     def apply_action_force(self, p_force):
@@ -257,7 +265,7 @@ class World(object):
                 entity.state.p_vel = k_force
 
             if not entity.movable: continue
-            entity.state.p_vel = entity.state.p_vel * (1 - self.damping)
+            entity.state.p_vel = entity.state.p_vel * ((1 - self.damping) ** (1/self.num_physics_steps))
             if (p_force[i] is not None):
                 entity.state.p_vel += (p_force[i] / entity.mass) * self.dt
             if entity.max_speed is not None:
